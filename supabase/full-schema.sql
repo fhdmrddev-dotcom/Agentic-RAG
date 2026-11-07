@@ -1303,10 +1303,11 @@ $$;
 
 CREATE FUNCTION public.view_iso_to_date(s text) RETURNS date
     LANGUAGE plpgsql IMMUTABLE STRICT
+    SET search_path TO ''
     AS $_$
 BEGIN
-  IF s !~ '^\d{4}-\d{2}-\d{2}$' THEN
-    RETURN NULL;  -- not ISO YYYY-MM-DD shape
+  IF s !~ '^\d{4}-\d{2}-\d{2}([T ].*)?$' THEN
+    RETURN NULL;  -- not 'YYYY-MM-DD', optionally followed by a time
   END IF;
   RETURN make_date(
     substring(s FROM 1 FOR 4)::int,   -- year

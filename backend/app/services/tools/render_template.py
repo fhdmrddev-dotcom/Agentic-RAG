@@ -83,17 +83,34 @@ import sys
 
 _PLACEHOLDER_TOKEN_RE = re.compile(r"\{\{\s*[A-Za-z_][\w.]*\s*\}\}")
 _RESIDUAL_TOKENS = ("{{", "}}", "{%", "%}")
+# Phase 303 (D-07): a rendered span carrying this is a whole cited record printed as text.
+_RECORD_TEXT_MARK = "'source_chunk_id':"
+_RECORD_TEXT_PREFIX = "record text: "
+
+
+class _CitedCell(dict):
+    # Phase 303 (D-06, FIX-15): a cited cell IS a dict, so {{ name.value }}, {% if name %},
+    # == and |default resolve exactly as before; str() is the value, so a bare {{ name }}
+    # prints "Ann" instead of the whole record. Deliberately NO repr override (a whole row
+    # or list printed must still show the record marker, so the residual scan catches it),
+    # NO html hook (markupsafe must still escape str(cell) like {{ name.value }}), and no
+    # getattr/format hooks (nothing new for the Jinja sandbox to reach).
+    __slots__ = ()
+
+    def __str__(self):
+        v = self.get("value")
+        return "" if v is None else str(v)
 
 
 def _cell(cited):
     cited = cited or {}
     v = cited.get("value") if isinstance(cited, dict) else None
-    return {
+    return _CitedCell({
         "value": "" if v is None else v,
         "source_chunk_id": cited.get("source_chunk_id") if isinstance(cited, dict) else None,
         "source_doc": cited.get("source_doc") if isinstance(cited, dict) else None,
         "source_page": cited.get("source_page") if isinstance(cited, dict) else None,
-    }
+    })
 
 
 def _build_row(row):
@@ -166,16 +183,27 @@ def _replace_in_paragraph(paragraph, flat_scalars):
         return
     full = paragraph.text
     matched = set()
-    replaced_text = full
-    for key, value in flat_scalars.items():
-        token = "{{" + key + "}}"
-        if token in replaced_text:
+    blanked = []
+    # Phase 303 (D-08): {{key}}, {{ key }} and {{ key.value }} with any inner spacing.
+    # D-18 (303-REVIEW WR-02): ONE pass over the ORIGINAL text - a known key, else an
+    # unknown placeholder-shaped token (blanked) - so an inserted value is never re-scanned
+    # by a later key or by the blank. A token inside a value is user data and survives; the
+    # residual scan then fails the file honestly. re.escape keeps each key literal (longest
+    # first); the FUNCTION replacement keeps a value's backslashes literal.
+    alts = "|".join(re.escape(k) for k in sorted(flat_scalars, key=len, reverse=True))
+    known = r"\{\{\s*(?P<key>" + alts + r")(?:\.value)?\s*\}\}|" if alts else ""
+    token_re = re.compile(known + r"(?P<unknown>" + _PLACEHOLDER_TOKEN_RE.pattern + r")")
+
+    def _sub(m):
+        key = m.group("key") if alts else None
+        if key is not None:
             matched.add(key)
-            replaced_text = replaced_text.replace(token, value)
-    # Blank any remaining placeholder-shaped token (unmatched intended placeholders).
-    blanked_text = _PLACEHOLDER_TOKEN_RE.sub("", replaced_text)
-    touched = matched or (blanked_text != replaced_text)
-    replaced_text = blanked_text
+            return flat_scalars[key]
+        blanked.append(True)  # unmatched intended placeholder
+        return ""
+
+    replaced_text = token_re.sub(_sub, full)
+    touched = matched or blanked
     if not touched:
         return  # no token here -> leave runs (and their formatting) intact
     # Coalesce: whole replaced text into run[0], clear the rest.
@@ -193,14 +221,28 @@ def run_replace_docx(template_path, flat_scalars, out_path):
         for p in paragraphs:
             _replace_in_paragraph(p, flat_scalars)
 
+    def _walk_tables(tables):
+        # Phase 303 (D-09): every cell, then every table nested inside it.
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    _walk(cell.paragraphs)
+                    _walk_tables(cell.tables)
+
     _walk(doc.paragraphs)
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                _walk(cell.paragraphs)
+    _walk_tables(doc.tables)
     for section in doc.sections:
         _walk(section.header.paragraphs)
         _walk(section.footer.paragraphs)
+        _walk_tables(section.header.tables)
+        _walk_tables(section.footer.tables)
+        # First-page / even-page variants only when the template defines them: touching
+        # .paragraphs on an undefined one ADDS a header part to the output.
+        for hf in (section.first_page_header, section.first_page_footer,
+                   section.even_page_header, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                _walk(hf.paragraphs)
+                _walk_tables(hf.tables)
     doc.save(out_path)
     return {"rendered": True, "error": None}
 
@@ -540,12 +582,41 @@ def _pdf_documented_limit(fill):
     return " ".join(parts) or None
 
 
-def _hits(texts):
+def _hits(texts, mark_records=False):
     out = []
     for txt in texts:
-        if txt and any(tok in txt for tok in _RESIDUAL_TOKENS):
+        if not txt:
+            continue
+        if mark_records and _RECORD_TEXT_MARK in txt:
+            # Phase 303 (D-07): the prefix goes on AFTER the 80-char cut, so a long value
+            # can never push the marker out of the hit the handler reads.
+            out.append(_RECORD_TEXT_PREFIX + txt.strip()[:80])
+        elif any(tok in txt for tok in _RESIDUAL_TOKENS):
             out.append(txt.strip()[:80])
     return out
+
+
+def _docx_texts(doc):
+    # Phase 303 (D-09): body paragraphs, every table cell recursively (python-docx's
+    # cell.text leaves nested tables out), and every header/footer variant a section
+    # defines (is_linked_to_previous is read-only; .paragraphs on an undefined one adds it).
+    texts = [p.text for p in doc.paragraphs]
+
+    def _tables(tables):
+        for t in tables:
+            for row in t.rows:
+                for cell in row.cells:
+                    texts.append(cell.text)
+                    _tables(cell.tables)
+
+    _tables(doc.tables)
+    for section in doc.sections:
+        for hf in (section.header, section.first_page_header, section.even_page_header,
+                   section.footer, section.first_page_footer, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                texts.extend(p.text for p in hf.paragraphs)
+                _tables(hf.tables)
+    return texts
 
 
 def residual_tags_in(out_path, fmt):
@@ -553,13 +624,7 @@ def residual_tags_in(out_path, fmt):
     if fmt == "docx":
         from docx import Document
 
-        doc = Document(out_path)
-        texts = [p.text for p in doc.paragraphs]
-        for t in doc.tables:
-            for row in t.rows:
-                for cell in row.cells:
-                    texts.append(cell.text)
-        return _hits(texts)
+        return _hits(_docx_texts(Document(out_path)), mark_records=True)
     if fmt == "pptx":
         from pptx import Presentation
 
@@ -738,6 +803,9 @@ _SAFE_OUT_FILENAME_RE = _re_filename.compile(r"^[A-Za-z0-9._ -]+\.(docx|pptx|xls
 # The engine token is server-generated (select_engine, or "acroform" for a .pdf template —
 # Phase 291) but we whitelist it before interpolation anyway (defense-in-depth — CR-01 step 3).
 _VALID_RENDER_ENGINES = frozenset({"docxtpl", "run_replace", "acroform"})
+# Phase 303 (D-07): the driver prefixes a residual hit with this when the rendered text is
+# a whole cited record. Equal to the driver's and the service's copy (test_303 parity pin).
+_RECORD_TEXT_PREFIX = "record text: "
 
 
 def _safe_out_filename(raw: str | None, template_ext: str) -> str:
@@ -1062,8 +1130,34 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
     verdict = run_out.get("verdict")
     produced = run_out.get("produced")
 
+    def _remove_from_output() -> None:
+        """Synchronous sandbox delete of the produced file (run in a threadpool)."""
+        import shlex as _shlex_local
+
+        session = sandbox_manager.get_or_create(ctx.thread_id)
+        res = session.execute_command(
+            " ".join(_shlex_local.quote(tok) for tok in ("rm", "-f", container_out))
+        )
+        code = getattr(res, "exit_code", 0)
+        if code not in (0, None):
+            raise RuntimeError(f"rm exited {code}")
+
+    async def _discard_refused_output() -> None:
+        # Phase 303 (D-19, 303-REVIEW WR-03): the driver writes straight into /sandbox/output,
+        # and a later execute_code harvest or a source='sandbox_output' attach publishes
+        # whatever sits there. A file this handler refused must not stay there to be
+        # delivered by another door. A failed delete is logged and never masks the refusal.
+        try:
+            await run_in_threadpool(_remove_from_output)
+        except Exception as exc:  # noqa: BLE001 — the refusal reason is what the model needs
+            logger.warning(
+                "render_template could not remove refused output thread=%s path=%s err=%s",
+                ctx.thread_id, container_out, exc,
+            )
+
     if not verdict:
         # A missing/garbled verdict is a FAILURE — never persist (T-101-04-05).
+        await _discard_refused_output()
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
             "reason": "no_verdict",
@@ -1085,14 +1179,32 @@ async def _handle_render_template(args: dict, ctx: ToolContext) -> ToolResult:
         # Preserve the cited field-map as fallback output so the extracted data isn't
         # lost (D-08), and the harness bounded-retry loop re-renders.
         reason = "residual_tokens" if (verdict.get("rendered") and verdict.get("opened")) else "integrity"
-        msg = (
-            "The rendered file opened but still contains unsubstituted placeholder tokens "
-            "(a silent non-fill) and was NOT delivered. The cited field-map is preserved "
-            "below as fallback."
-            if reason == "residual_tokens"
-            else "The rendered file failed the integrity re-open and was NOT delivered. "
-                 "The cited field-map is preserved below as fallback."
-        )
+        tags = verdict.get("residual_tags") or []
+        record_hits = [t for t in tags if isinstance(t, str) and t.startswith(_RECORD_TEXT_PREFIX)]
+        fallback = " The cited field-map is preserved below as fallback."
+        if reason == "residual_tokens" and record_hits and len(record_hits) == len(tags):
+            # Phase 303 (D-21, 303-REVIEW IN-02): every hit is record text, so the cause is
+            # the TEMPLATE printing a whole record; re-emitting the field map cannot fix it.
+            msg = (
+                "A field printed as raw record text: the template printed a whole cited "
+                "record (for example {{ r }} or {{ rows }}) instead of a value, so the file "
+                "was NOT delivered. Use {{ name }} or {{ name.value }} for a single field; "
+                "a new field map will not change this." + fallback
+            )
+        elif reason == "residual_tokens":
+            msg = (
+                "The rendered file opened but still contains unsubstituted placeholder tokens "
+                "(a silent non-fill) and was NOT delivered."
+            )
+            if record_hits:
+                msg += (
+                    " A field also printed as raw record text (a whole cited record instead "
+                    "of its value)."
+                )
+            msg += fallback
+        else:
+            msg = "The rendered file failed the integrity re-open and was NOT delivered." + fallback
+        await _discard_refused_output()
         return ToolResult(result=_json_local.dumps({
             "status": "failed",
             "reason": reason,

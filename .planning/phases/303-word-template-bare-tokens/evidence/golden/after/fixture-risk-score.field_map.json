@@ -1,0 +1,188 @@
+{
+ "collections": {
+  "rows": [
+   {
+    "cause": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "cause row 0"
+    },
+    "effect": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "effect row 0"
+    },
+    "event": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "event row 0"
+    },
+    "impact": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "impact row 0"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "owner row 0"
+    },
+    "probability": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "probability row 0"
+    },
+    "response_strategy": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "response_strategy row 0"
+    },
+    "risk_id": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "risk_id row 0"
+    },
+    "status": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": "status row 0"
+    }
+   },
+   {
+    "cause": {
+     "source_chunk_id": "chunk-0",
+     "source_doc": "doc.pdf",
+     "source_page": 0,
+     "value": null
+    },
+    "effect": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "effect row 1"
+    },
+    "event": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "event row 1"
+    },
+    "impact": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "impact row 1"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "owner row 1"
+    },
+    "probability": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "probability row 1"
+    },
+    "response_strategy": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "response_strategy row 1"
+    },
+    "risk_id": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "risk_id row 1"
+    },
+    "status": {
+     "source_chunk_id": "chunk-1",
+     "source_doc": "doc.pdf",
+     "source_page": 1,
+     "value": "status row 1"
+    }
+   },
+   {
+    "cause": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "cause row 2"
+    },
+    "effect": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "effect row 2"
+    },
+    "event": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "event row 2"
+    },
+    "impact": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "impact row 2"
+    },
+    "owner": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "owner row 2"
+    },
+    "probability": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "probability row 2"
+    },
+    "response_strategy": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "response_strategy row 2"
+    },
+    "risk_id": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "risk_id row 2"
+    },
+    "status": {
+     "source_chunk_id": "chunk-2",
+     "source_doc": "doc.pdf",
+     "source_page": 2,
+     "value": "status row 2"
+    }
+   }
+  ]
+ },
+ "scalars": {
+  "project_name": {
+   "source_chunk_id": "chunk-0",
+   "source_doc": "doc.pdf",
+   "source_page": 0,
+   "value": "Value of project_name & <x>"
+  },
+  "report_date": {
+   "source_chunk_id": "chunk-1",
+   "source_doc": "doc.pdf",
+   "source_page": 1,
+   "value": "Value of report_date & <x>"
+  }
+ }
+}

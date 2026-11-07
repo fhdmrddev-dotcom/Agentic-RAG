@@ -1,0 +1,12 @@
+== docxtpl_bare verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 2, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann", "Late vendor", ""]}
+== docxtpl_value verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== docxtpl_default verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== run_replace_bare_spaced verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== run_replace_bare_tight verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== run_replace_value verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}

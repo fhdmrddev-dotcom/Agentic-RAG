@@ -1,0 +1,53 @@
+{
+ "collections": {},
+ "scalars": {
+  "accomplishments": {
+   "source_chunk_id": "chunk-0",
+   "source_doc": "doc.pdf",
+   "source_page": 0,
+   "value": "Value of accomplishments & <x>"
+  },
+  "milestones": {
+   "source_chunk_id": "chunk-1",
+   "source_doc": "doc.pdf",
+   "source_page": 1,
+   "value": "Value of milestones & <x>"
+  },
+  "overall_rag_status": {
+   "source_chunk_id": "chunk-2",
+   "source_doc": "doc.pdf",
+   "source_page": 2,
+   "value": "Value of overall_rag_status & <x>"
+  },
+  "planned_next": {
+   "source_chunk_id": "chunk-3",
+   "source_doc": "doc.pdf",
+   "source_page": 3,
+   "value": "Value of planned_next & <x>"
+  },
+  "project_name": {
+   "source_chunk_id": "chunk-4",
+   "source_doc": "doc.pdf",
+   "source_page": 4,
+   "value": "Value of project_name & <x>"
+  },
+  "reporting_period": {
+   "source_chunk_id": "chunk-5",
+   "source_doc": "doc.pdf",
+   "source_page": 5,
+   "value": "Value of reporting_period & <x>"
+  },
+  "risks_blockers": {
+   "source_chunk_id": "chunk-6",
+   "source_doc": "doc.pdf",
+   "source_page": 6,
+   "value": "Value of risks_blockers & <x>"
+  },
+  "summary": {
+   "source_chunk_id": "chunk-7",
+   "source_doc": "doc.pdf",
+   "source_page": 7,
+   "value": "Value of summary & <x>"
+  }
+ }
+}

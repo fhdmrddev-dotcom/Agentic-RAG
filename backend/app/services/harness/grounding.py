@@ -1384,6 +1384,58 @@ def _external_action_clause(
     return clause
 
 
+def citation_gate_can_never_pass(phase, spec) -> bool:
+    """True when ``spec`` is a ``citations_required`` gate this step's output cannot satisfy.
+
+    BUG-261106-01. Deterministic mode (the default when ``mode`` is absent; ``emit`` is its
+    alias) checks ``output["field_map"]``, and only an ``llm_emit`` step returns one. On any
+    other step it fails every attempt with ``no field_map on output``. The drafter wrote
+    such gates with an invented ``require_citations`` key, which left ``mode`` unset.
+
+    PURE, like ``grounding_cause``: a total function of one parsed phase and one spec.
+    """
+    if getattr(spec, "kind", None) != "citations_required":
+        return False
+    mode = (getattr(spec, "config", None) or {}).get("mode", "deterministic")
+    if mode not in ("deterministic", "emit"):
+        return False
+    return getattr(phase.config, "phase_type", None) != "llm_emit"
+
+
+#: The extensions ``output_file_valid`` can re-open (``validator_kinds._OOXML_FORMATS`` +
+#: the ``pdf`` stub). Any other extension fails that gate closed, by design.
+_FILE_GATE_OPENABLE = frozenset({"docx", "pptx", "xlsx", "pdf"})
+
+
+def file_gate_can_never_pass(phase, spec) -> bool:
+    """True when ``spec`` is an ``output_file_valid`` gate this step can never satisfy.
+
+    BUG-261106-02. The gate checks ``output["output_file"]``, which only an ``llm_emit``
+    step returns, or else ``config["path"]`` in the workspace. On any other step with no
+    openable ``config.path`` the filename is ``''`` and every attempt fails with
+    ``unsupported format ''``. The drafter wrote such gates with invented keys
+    (``extensions``, ``must_contain``, ``required_filename_pattern``) the gate never reads.
+
+    PURE, like ``citation_gate_can_never_pass``.
+    """
+    if getattr(spec, "kind", None) != "output_file_valid":
+        return False
+    if getattr(phase.config, "phase_type", None) == "llm_emit":
+        return False
+    path = str((getattr(spec, "config", None) or {}).get("path") or "")
+    ext = path.rsplit(".", 1)[1].lower() if "." in path else ""
+    return ext not in _FILE_GATE_OPENABLE
+
+
+def gate_can_never_pass(phase, spec) -> bool:
+    """True when ``spec`` fails on this step every time, whatever the step produces.
+
+    The one question both the engine seam and the drafter ask. Each arm is a gate the
+    drafter was measured writing in a shape its validator does not read.
+    """
+    return citation_gate_can_never_pass(phase, spec) or file_gate_can_never_pass(phase, spec)
+
+
 def effective_phase(phase, *, total_phases: int):
     """The phase the ENGINE runs: the authored validators PLUS the synthesized gate.
 
@@ -1431,6 +1483,20 @@ def effective_phase(phase, *, total_phases: int):
     then followed by the real one. The author's spec cannot displace the engine's, and
     substituting would silently discard the author's ``on_failure`` routing. That is what
     makes "not author-loosenable-away" structural rather than trusted.
+
+    BUG-261106-01 — THE ONE EXCEPTION: an author spec that CAN NEVER PASS on this step
+    (``citation_gate_can_never_pass``) is dropped when the engine's own gate is added. It
+    is not a stricter gate, it is a broken one: it failed every run before the engine's
+    gate was reached. Dropping it loosens nothing, because the engine's gate still runs.
+    The stored definition keeps it (this seam is parse-time only), so drafts saved with
+    it before the drafter fix run correctly without an edit.
+
+    BUG-261106-02 added a second arm: an ``output_file_valid`` gate on a step that makes
+    no file it can open (``file_gate_can_never_pass``) is dropped on EVERY step, gated or
+    not. It fails whatever the step produces, so it has never let a run through, and
+    nothing replaces it because nothing it guarded ever existed. The citation arm keeps its
+    original scope (only where the engine's gate is appended). A phase with nothing dead
+    and nothing to add is still returned by reference.
     """
     from app.models.harness import ValidatorSpec  # function-local (import-light module)
 
@@ -1452,6 +1518,11 @@ def effective_phase(phase, *, total_phases: int):
             )
         )
 
-    if not extra:
+    kept = [
+        v for v in phase.validators
+        if not file_gate_can_never_pass(phase, v)
+        and not (extra and citation_gate_can_never_pass(phase, v))
+    ]
+    if not extra and len(kept) == len(phase.validators):
         return phase
-    return phase.model_copy(update={"validators": [*phase.validators, *extra]})
+    return phase.model_copy(update={"validators": [*kept, *extra]})

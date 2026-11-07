@@ -353,6 +353,11 @@ def _iter_leaves(fm_dict: dict):
         # other shapes (bare scalars, nested non-cited) are ignored as non-leaves
 
 
+# Row keys the driver computes itself (``_build_row``'s ``r.setdefault("score", "")``), so
+# the parse oracle never asks the model for them (Phase 303, D-17).
+_DERIVED_ROW_KEYS = frozenset({"score"})
+
+
 def parse_docx_template_variables(data: bytes) -> dict | None:
     """Parse a TRUSTED docx template's Jinja placeholders WITHOUT docxtpl (Pitfall 4 —
     the heavy lib never enters backend/app/**; a docx is a zip and the tokens are plain
@@ -364,10 +369,14 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     ``{{ root(.attr)* }}`` token (the 097/101 trusted templates dereference ``Cited``
     dicts: ``{{ project_name.value }}`` → context key ``project_name``); roots that are
     loop VARIABLES (``{{ r.cause.value }}`` where ``{%tr for r in rows %}``) or
-    collection names are excluded — those are loop-local. A COLUMN is a loop-var deref
-    ending in ``.value`` (``{{ r.risk_id.value }}`` → column ``risk_id`` of ``rows``) —
-    the Cited cells the MODEL must emit; bare loop derefs (``{{ r.score }}``) are
-    driver-computed (the D-11 derived-compute hook) and excluded from the oracle.
+    collection names are excluded — those are loop-local. A COLUMN is a loop-var deref,
+    with or without ``.value`` (``{{ r.risk_id.value }}`` or ``{{ r.risk_id }}`` → column
+    ``risk_id`` of ``rows``) — the Cited cells the MODEL must emit. Phase 303 (D-17):
+    the bare form counts too, because a bare loop column nobody asked the model for
+    renders blank with a clean verdict. The one exception is ``score``
+    (``_DERIVED_ROW_KEYS``): ``_build_row`` computes it (the D-11 derived-compute hook),
+    so ``{{ r.score }}`` stays out of the oracle. A filtered token (``{{ r.x|upper }}``)
+    is not read here, for scalars and columns alike (pre-existing limit).
 
     101.1-06: this is the 097 "parse template first" coverage oracle, productized — the
     emit prompt names EXACTLY these keys and ``check_coverage`` validates against them
@@ -400,9 +409,9 @@ def parse_docx_template_variables(data: bytes) -> dict | None:
     scalars = roots - set(loop_vars) - collections
     columns: dict[str, set] = {}
     for var, col in re.findall(
-        r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)\.value\s*\}\}", text
+        r"\{\{\s*([A-Za-z_]\w*)\.([A-Za-z_]\w*)(?:\.value)?\s*\}\}", text
     ):
-        if var in loop_vars:
+        if var in loop_vars and col not in _DERIVED_ROW_KEYS:
             columns.setdefault(loop_vars[var], set()).add(col)
     if not scalars and not collections:
         return None
@@ -582,18 +591,39 @@ def _num(cited: dict | None):
         return None
 
 
+class _CitedCell(dict):
+    """A cited cell: a plain ``dict`` whose ``str()`` is its value (Phase 303, D-06)."""
+
+    # Phase 303 (D-06, FIX-15): a cited cell IS a dict, so {{ name.value }}, {% if name %},
+    # == and |default resolve exactly as before; str() is the value, so a bare {{ name }}
+    # prints "Ann" instead of the whole record. Deliberately NO repr override (a whole row
+    # or list printed must still show the record marker, so the residual scan catches it),
+    # NO html hook (markupsafe must still escape str(cell) like {{ name.value }}), and no
+    # getattr/format hooks (nothing new for the Jinja sandbox to reach). The sandbox driver
+    # (render_template._RENDER_DRIVER_SRC) carries the same class; test_303 parity pins them.
+    __slots__ = ()
+
+    def __str__(self) -> str:
+        v = self.get("value")
+        return "" if v is None else str(v)
+
+
 def _cell(cited: dict | None) -> dict:
     """A display-safe Cited dict: value None -> '' so a not-found field renders as a
     BLANK cell, never the literal 'None'. Keeps the nested dict shape so a template's
-    ``{{ r.<field>.value }}`` lookup still resolves (PORT render_docx.py:65)."""
+    ``{{ r.<field>.value }}`` lookup still resolves (PORT render_docx.py:65).
+
+    Phase 303 (D-06): a bare ``{{ name }}`` prints the value because str() of the returned
+    ``_CitedCell`` is the value; ``{{ name.value }}``, ``{% if name %}`` and ``|default``
+    resolve through the dict exactly as before."""
     cited = cited or {}
     v = cited.get("value")
-    return {
+    return _CitedCell({
         "value": "" if v is None else v,
         "source_chunk_id": cited.get("source_chunk_id"),
         "source_doc": cited.get("source_doc"),
         "source_page": cited.get("source_page"),
-    }
+    })
 
 
 def build_context(field_map_dict: dict, *, numeric_hook: Optional[Callable[[dict], dict]] = None) -> dict:
@@ -732,17 +762,27 @@ def _replace_in_paragraph(paragraph, flat_scalars: dict[str, str]) -> tuple[set[
 
     full = paragraph.text
     matched: set[str] = set()
-    replaced_text = full
-    for key, value in flat_scalars.items():
-        token = "{{" + key + "}}"
-        if token in replaced_text:
-            matched.add(key)
-            replaced_text = replaced_text.replace(token, value)
+    blanked: list[bool] = []
+    # Phase 303 (D-08): {{key}}, {{ key }} and {{ key.value }} with any inner spacing.
+    # D-18 (303-REVIEW WR-02): ONE pass over the ORIGINAL text — a known key, else an
+    # unknown placeholder-shaped token (blanked) — so an inserted value is never re-scanned
+    # by a later key or by the blank. A token inside a value is user data and survives; the
+    # residual scan then fails the file honestly. re.escape keeps each key literal (longest
+    # first); the FUNCTION replacement keeps a value's backslashes literal.
+    alts = "|".join(re.escape(k) for k in sorted(flat_scalars, key=len, reverse=True))
+    known = r"\{\{\s*(?P<key>" + alts + r")(?:\.value)?\s*\}\}|" if alts else ""
+    token_re = re.compile(known + r"(?P<unknown>" + _PLACEHOLDER_TOKEN_RE.pattern + r")")
 
-    # Blank any remaining placeholder-shaped token (unmatched intended placeholders).
-    blanked_text = _PLACEHOLDER_TOKEN_RE.sub("", replaced_text)
-    touched = matched or (blanked_text != replaced_text)
-    replaced_text = blanked_text
+    def _sub(m: re.Match) -> str:
+        key = m.group("key") if alts else None
+        if key is not None:
+            matched.add(key)
+            return flat_scalars[key]
+        blanked.append(True)  # unmatched intended placeholder
+        return ""
+
+    replaced_text = token_re.sub(_sub, full)
+    touched = matched or blanked
 
     if not touched:
         return set(), matched  # no token here → leave runs (and their formatting) intact
@@ -763,8 +803,15 @@ def run_replace_docx(template_path: str, scalars: dict, out_path: str) -> dict:
     trusted-path-only capability — D-04).
 
     ``scalars`` values may be a ``Cited`` dict (take ``.get('value')``) or a raw string;
-    None → '' (blank). Walks: each body paragraph, each table cell paragraph, and each
-    section header/footer paragraph (the python-docx-traversable surface). Text boxes /
+    None → '' (blank). Walks: each body paragraph, each table cell paragraph including
+    nested tables (Phase 303, D-09), and the paragraphs and tables of the default,
+    first-page and even-page header and footer of every section (the
+    python-docx-traversable surface). A first-page / even-page variant the template does
+    not define is never touched, so no such part is added; the DEFAULT header and footer
+    are walked unguarded, so python-docx creates them when absent (pre-existing, and
+    blank — 303-REVIEW IN-01). A key matches ``{{key}}``, ``{{ key }}`` and
+    ``{{ key.value }}`` with any inner spacing (D-08), in one pass over the template's
+    own text, so a token inside an inserted value is never filled or blanked (D-18). Text boxes /
     SmartArt / footnotes python-docx cannot reach are a documented limit — the residual
     scan (``residual_tags_in``) catches a surviving token as an honest fail, never a
     silent corruption (T-101-02-05).
@@ -792,17 +839,31 @@ def run_replace_docx(template_path: str, scalars: dict, out_path: str) -> dict:
             replaced_keys.update(rep)
             matched_keys.update(mat)
 
+    def _walk_tables(tables):
+        # Phase 303 (D-09): every cell, then every table nested inside it.
+        for table in tables:
+            for row in table.rows:
+                for cell in row.cells:
+                    _walk(cell.paragraphs)
+                    _walk_tables(cell.tables)
+
     # Body paragraphs.
     _walk(doc.paragraphs)
-    # Table cell paragraphs.
-    for table in doc.tables:
-        for row in table.rows:
-            for cell in row.cells:
-                _walk(cell.paragraphs)
-    # Section header/footer paragraphs.
+    # Table cell paragraphs, nested tables included.
+    _walk_tables(doc.tables)
+    # Section header/footer paragraphs and tables.
     for section in doc.sections:
         _walk(section.header.paragraphs)
         _walk(section.footer.paragraphs)
+        _walk_tables(section.header.tables)
+        _walk_tables(section.footer.tables)
+        # First-page / even-page variants only when the template defines them: touching
+        # .paragraphs on an undefined one ADDS a header part to the output.
+        for hf in (section.first_page_header, section.first_page_footer,
+                   section.even_page_header, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                _walk(hf.paragraphs)
+                _walk_tables(hf.tables)
 
     doc.save(out_path)
 
@@ -820,35 +881,69 @@ def run_replace_docx(template_path: str, scalars: dict, out_path: str) -> dict:
 # ---------------------------------------------------------------------------
 
 _RESIDUAL_TOKENS = ("{{", "}}", "{%", "%}")
+# Phase 303 (D-07): a rendered span carrying this is a whole cited record printed as text
+# (a bare {{ r }} / {{ rows }} the _CitedCell coercion cannot reach). Such a hit is
+# prefixed with _RECORD_TEXT_PREFIX so the handler can word the failure. Same values in the
+# sandbox driver (render_template._RENDER_DRIVER_SRC); test_303 parity pins them.
+_RECORD_TEXT_MARK = "'source_chunk_id':"
+_RECORD_TEXT_PREFIX = "record text: "
 
 
-def _hits(texts: list[str]) -> list[str]:
+def _hits(texts: list[str], mark_records: bool = False) -> list[str]:
     hits: list[str] = []
     for txt in texts:
-        if txt and any(tok in txt for tok in _RESIDUAL_TOKENS):
+        if not txt:
+            continue
+        if mark_records and _RECORD_TEXT_MARK in txt:
+            # The prefix goes on AFTER the 80-char cut, so a long value can never push the
+            # marker out of the hit the handler reads.
+            hits.append(_RECORD_TEXT_PREFIX + txt.strip()[:80])
+        elif any(tok in txt for tok in _RESIDUAL_TOKENS):
             hits.append(txt.strip()[:80])
     return hits
+
+
+def _docx_texts(doc) -> list[str]:
+    """Every docx text span the residual scan reads (Phase 303, D-09): body paragraphs,
+    every table cell recursively (python-docx's ``cell.text`` leaves nested tables out),
+    and every header/footer variant a section defines."""
+    texts: list[str] = [p.text for p in doc.paragraphs]
+
+    def _tables(tables) -> None:
+        for t in tables:
+            for row in t.rows:
+                for cell in row.cells:
+                    texts.append(cell.text)
+                    _tables(cell.tables)
+
+    _tables(doc.tables)
+    for section in doc.sections:
+        # is_linked_to_previous is read-only; .paragraphs on an undefined variant adds it.
+        for hf in (section.header, section.first_page_header, section.even_page_header,
+                   section.footer, section.first_page_footer, section.even_page_footer):
+            if not hf.is_linked_to_previous:
+                texts.extend(p.text for p in hf.paragraphs)
+                _tables(hf.tables)
+    return texts
 
 
 def residual_tags_in(out_path: str, fmt: str) -> list[str]:
     """Any leftover Jinja/token markup after a render = a NOT-substituted tag (a silent
     non-fill). Re-opens the produced file and scans every text span; returns the hits.
 
-    docx → body paragraphs + table cells; pptx → shape/text-frame runs + table cells;
-    xlsx → cell values. The heavy-lib imports are function-local (sandbox-only at
-    runtime — Pitfall 4). An empty list = no surviving token (a clean fill).
+    docx → body paragraphs, every table cell recursively (nested tables), and the
+    default / first-page / even-page header and footer of every section (paragraphs and
+    tables); a span carrying a whole cited record (``'source_chunk_id':``) is also a hit,
+    prefixed ``record text: `` (Phase 303, D-07 / D-09). pptx → shape/text-frame runs +
+    table cells; xlsx → cell values. The heavy-lib imports are function-local
+    (sandbox-only at runtime — Pitfall 4). An empty list = no surviving token (a clean
+    fill).
     """
     fmt = fmt.lower()
     if fmt == "docx":
         from docx import Document
 
-        doc = Document(out_path)
-        texts = [p.text for p in doc.paragraphs]
-        for t in doc.tables:
-            for row in t.rows:
-                for cell in row.cells:
-                    texts.append(cell.text)
-        return _hits(texts)
+        return _hits(_docx_texts(Document(out_path)), mark_records=True)
 
     if fmt == "pptx":
         from pptx import Presentation

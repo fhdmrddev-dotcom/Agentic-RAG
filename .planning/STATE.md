@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v4.9
 milestone_name: Use It From Your Own Tools
-status: ready_to_plan
-last_updated: 2026-11-03T13:59:23.092Z
-last_activity: 2026-10-31 -- Phase 306 execution started
+status: verifying
+last_updated: "2026-11-06T04:08:24.756Z"
+last_activity: 2026-11-06
 progress:
   total_phases: 14
-  completed_phases: 2
-  total_plans: 15
-  completed_plans: 15
-  percent: 14
-stopped_at: Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
+  completed_phases: 6
+  total_plans: 27
+  completed_plans: 27
+  percent: 43
+stopped_at: Phase 303 CLOSED 2026-11-06 — verification passed; live U-1 (826d3eaf, 6bc7da96) + U-2 (f125d3e5; pre-303 replays identical) PASSED; U-1 found + fixed a generic refusal message (emit_cause); BUG-261022-01 CLOSED; SECURE 9/9; baseline 70/71; DEPLOYED 2026-11-06 — production 6bc320f3c (8 code commits cherry-picked onto 2cc9b4845, fast-forward). Phase 308 EXECUTED 2026-11-05 — verification human_needed (5/5 SC in code); 6 human rows owed (308-HUMAN-UAT.md, row 1 first); not closed, not deployed
 ---
 
 # Project State
@@ -31,7 +31,7 @@ See: `.planning/PROJECT.md` (updated 2026-10-30)
 
 **Core value:** The agent acts as an AI colleague — it knows your knowledge base, can run code, and
 can be taught new behaviours (skills) that persist and can be shared.
-**Current focus:** Phase 307 — sign in from claude.ai and claude desktop
+**Current focus:** Phase 303 — Word Template Bare Tokens
 
 ---
 
@@ -45,10 +45,12 @@ reviewer exists, so a phase closes `verification_mode: self-verified`, never `re
 ## Current Position
 
 Milestone: v4.9 Use It From Your Own Tools
-Phase: 308
-Plan: 6 of 6 (complete; human UAT owed)
-Status: Phase 308 executed — 6/6 plans merged, review 1C/6W fixed, verification human_needed; owed: 308-HUMAN-UAT.md rows 1-6, cloud mig 225 after 220→224 (per-action approval) + get_advisors(security), public docs (309) before deploy
-Last activity: 2026-11-04
+Phase: 303 (Word Template Bare Tokens)
+Plan: 1 of 1 (complete; human UAT owed)
+Status: Phase 303 executed — 1/1 plan, review 1C/3W (6 fixed, WR-01 accepted D-20), SECURE 9/9, baseline 70/71, verification human_needed; U-1 PASSED live 2026-11-06 after one fix (record-text refusal message on the workflow path, emit_cause + one phase_types kwarg); BUG-261022-01 closed; U-2 PASSED live 2026-11-06; phase CLOSED (verification passed), LIVE on production 6bc320f3c 2026-11-06
+Last activity: 2026-11-06
+
+Also open (restored by hand 2026-11-06 — the `state.*` SDK verbs overwrote it, see the header warning): Phase 308 executed — 6/6 plans merged, review 1C/6W fixed, verification human_needed; owed: 308-HUMAN-UAT.md rows 1-6, cloud mig 225 after 220→224 (per-action approval) + get_advisors(security), public docs (309) before deploy
 
 Phases start at **303**; migrations at **220**. Seeds taken in at intake: SEED-013, SEED-177, SEED-195, SEED-081, SEED-079; bug BUG-261022-01.
 

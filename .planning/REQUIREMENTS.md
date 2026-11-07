@@ -63,7 +63,7 @@ Decided at intake (operator, 2026-10-30):
 
 ### Fix (FIX)
 
-- [ ] **FIX-15**: A Word template using a bare `{{ name }}` renders the value, or fails the integrity check, instead of writing a cited record's dict text into the document. The bug is reproduced through the real sandbox driver first, and `{{ name.value }}` templates keep working. — `BUG-261022-01`
+- [x] **FIX-15**: A Word template using a bare `{{ name }}` renders the value, or fails the integrity check, instead of writing a cited record's dict text into the document. The bug is reproduced through the real sandbox driver first, and `{{ name.value }}` templates keep working. — `BUG-261022-01`
 
 ### Register and docs (REG)
 
@@ -126,5 +126,5 @@ Decided at intake (operator, 2026-10-30):
 | GUARD-01 | Phase 306 | Complete |
 | GUARD-02 | Phase 305 | Pending |
 | GUARD-03 | Phase 305 | Pending |
-| FIX-15 | Phase 303 | Pending |
+| FIX-15 | Phase 303 | Complete |
 | REG-10 | Phase 309 | Pending |

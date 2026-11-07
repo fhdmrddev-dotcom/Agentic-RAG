@@ -81,7 +81,7 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
 
 ### Phase Checklist
 
-- [ ] **Phase 303: Word Template Bare Tokens**: reproduce BUG-261022-01 through the real sandbox driver, then a bare `{{ name }}` renders the value or fails the integrity check; `{{ name.value }}` keeps working (FIX-15)
+- [x] **Phase 303: Word Template Bare Tokens**: reproduce BUG-261022-01 through the real sandbox driver, then a bare `{{ name }}` renders the value or fails the integrity check; `{{ name.value }}` keeps working (FIX-15) — **CLOSED 2026-11-06** (4/4 SC; live U-1 + U-2 PASSED, U-1 found + fixed a generic refusal message; BUG-261022-01 closed; LIVE on production 6bc320f3c 2026-11-06)
 - [x] **Phase 304: Personal MCP Keys That Act as You**: acting-member org narrowing, one key resolver and liveness predicate, the key screen with presets and snippets, narrowing, revoke, org and operator kill switches, proven by a two-org parity test (KEY-01..06)
 - [x] **Phase 305: Connect Claude Code and Cursor**: stateless MCP server at one URL, `search_knowledge_base` / `list_documents` / `read_document`, tool labels and plain errors, maintenance behaviour, per-key audit and limits, spend attribution, fail-closed PII redaction (MCP-01, MCP-02, MCP-03, MCP-07, KEY-07, GUARD-02, GUARD-03) — **CLOSED 2026-10-31 by decision** (self-verified 4/5 SC; SC#1 client rows Cursor / cloud / one-box / Claude Desktop OWED to the operator; NOT deployed — deploys with 304)
 - [x] **Phase 306: Ask the Agent and Run Workflows**: `ask_agent` / `get_answer` with a closed read-only tool set, MCP asks in thread history, `list_workflows` / `run_workflow` / `get_workflow_run`, admission control for MCP and `/inbound` starts (MCP-04, MCP-05, MCP-06, GUARD-01) — **CLOSED 2026-11-03 by decision** (self-verified 5/5 SC after quick 261101-4y9 fixed review CR-01/CR-02; 5 live UAT rows OWED in 306-HUMAN-UAT.md, run row 5 first; NOT deployed — cloud 220→223 owed)
@@ -104,7 +104,9 @@ Requirements: [`REQUIREMENTS.md`](REQUIREMENTS.md). **29 v4.9 requirements, 29 m
   4. The sandbox driver and `template_render_service._replace_in_paragraph` behave the same on a bare token, pinned by one test that fails if the two copies diverge (FIX-15).
 
 **How we'd know this failed**: the repro ran only through a mirror and the driver still writes record text; only one of the two rendering copies is fixed; `residual_tags_in` still cannot see a rendered repr; the fix blanks the token so the document reads empty where a value belongs; `{{ name.value }}` or `|default` output changes; the integrity check skips headers, footers or nested tables; `Dockerfile.sandbox` changes without a new image tag and `SANDBOX_IMAGE` in the same commit.
-**Plans**: TBD
+**Plans**: 1 plan in 1 wave
+
+- [x] 303-01-PLAN.md — RED tests (driver script + service + D-10 parity), the fix in both copies (str-coercing cell, spaced/.value key match, nested + header-variant reach, record-text integrity fail), golden-identical, ledgers same commit, VALIDATION U-1/U-2 (wave 1, no DB)
 **Flags**: **The repro decides the size.** If the fix is a few lines in one file with no schema or API surface, run it as `/gsd:quick` (G-3), not a phase. **G-5**: `backend/app/services/tools/render_template.py` (`6 / 3 / 1163`, FIRES) — a minimal edit honoured by construction, or take its named seam first; read its section of `docs/HOT-FILE-LEDGER.md` at discuss. No image rebuild expected. No migration. No research. Folds `BUG-261022-01`.
 
 #### Phase 304: Personal MCP Keys That Act as You
@@ -267,7 +269,7 @@ Plans:
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 303. Word Template Bare Tokens | 0/TBD | Not started | - |
+| 303. Word Template Bare Tokens | 1/1 | Complete | 2026-11-06 |
 | 304. Personal MCP Keys That Act as You | 6/6 | Complete (self-verified 5/5; G-4 1-3 PASS; deploys WITH 305 — cloud 220/221 + D-41 owed) | 2026-10-31 |
 | 305. Connect Claude Code and Cursor | 5/5 | Complete by decision (self-verified 4/5 SC; SC#1 client rows OWED; deploys WITH 304) | 2026-10-31 |
 | 306. Ask the Agent and Run Workflows | 5/5 | Complete by decision (self-verified 5/5 SC; 5 live UAT rows OWED — row 5 first; cloud 220→223 owed) | 2026-11-03 |

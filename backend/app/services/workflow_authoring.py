@@ -1083,12 +1083,26 @@ async def generate_workflow_definition(
     # numbered from 1 (or left gaps) produced a draft that saved but could never publish
     # ("phase_index must be contiguous 0..0, got [1]"). Order follows the model's own numbers,
     # ties keep the emitted order, and slugs (what every cross-step reference uses) are untouched.
+    #
+    # BUG-261106-01: the same rebuild drops any citation gate the step can never pass. Models
+    # wrote `citations_required` with an invented `require_citations` key on agent steps; it
+    # fell back to field_map mode and failed every run. The engine's seam drops it too, but
+    # only on steps it gates itself, so a step that reads nothing is cleaned here or nowhere.
+    # BUG-261106-02: the same for an `output_file_valid` gate on a step that makes no file.
+    from app.services.harness.grounding import gate_can_never_pass  # function-local
+
     ordered = sorted(enumerate(wd.phases), key=lambda ip: (ip[1].phase_index, ip[0]))
     wd = wd.model_copy(
         update={
             "phases": [
                 p.model_copy(
-                    update={"name_seeded_by_ai": bool(p.name and p.name.strip()), "phase_index": i}
+                    update={
+                        "name_seeded_by_ai": bool(p.name and p.name.strip()),
+                        "phase_index": i,
+                        "validators": [
+                            v for v in p.validators if not gate_can_never_pass(p, v)
+                        ],
+                    }
                 )
                 for i, (_pos, p) in enumerate(ordered)
             ]

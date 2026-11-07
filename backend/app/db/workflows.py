@@ -1659,7 +1659,7 @@ async def get_latest_completed_workflow_run(
 
 
 # ── resume sweep reads (HARNESS-03 / Plan 04) ────────────────────────────────
-async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
+async def find_resumable_runs(pool: asyncpg.Pool, *, include_paused: bool = True) -> list[dict]:
     """Stranded runs to re-run on startup (HARNESS-03 startup sweep).
 
     A stranded run is one whose run row is still ``active``/``paused`` AND is the
@@ -1698,14 +1698,22 @@ async def find_resumable_runs(pool: asyncpg.Pool) -> list[dict]:
     survives a future author simplifying the query. Driven by
     ``tests/test_harness_engine.py::test_a_resumed_run_can_never_be_a_golden_run``,
     which was OBSERVED RED against the unfiltered version above.
+
+    BUG-261106-03: ``include_paused=False`` is the late boot pass, one lease after the first.
+    It looks only for ``active`` runs whose producer died (the first pass skipped them because
+    their last heartbeat was still fresh). Paused runs were already handled by the first pass
+    and are re-driven by the answer route. The status clause is one of two fixed literals.
     """
+    status_clause = (
+        "WHERE wr.status IN ('active', 'paused')" if include_paused else "WHERE wr.status = 'active'"
+    )
     rows = await pool.fetch(
         """
         SELECT wr.id AS run_id, wr.thread_id, wr.current_phase_id, wr.inputs,
                wr.org_id, wr.is_golden_run, t.user_id, wr.model, wr.metadata
         FROM workflow_runs wr
         JOIN threads t ON t.id = wr.thread_id
-        WHERE wr.status IN ('active', 'paused')
+        """ + status_clause + """
           AND t.active_workflow_run_id = wr.id
           AND wr.is_golden_run = false
           AND EXISTS (
@@ -2598,6 +2606,13 @@ async def claim_run(
 
     ``lease_seconds`` is passed as a Postgres interval via ``make_interval`` so the
     parameter stays a plain ``$N`` (no f-string on SQL — T-091-03).
+
+    ⚠ BUG-261106-03 — THE LEASE ONLY STOPPED TWO SWEEPS RACING; IT NEVER SAW A LIVE PRODUCER.
+    A fresh run takes no claim, so a booting sibling worker's sweep claimed runs the OTHER
+    worker was still driving (production runs ``0c8183fc`` and ``dc6e4c56``: two step-1 starts
+    each, the second at the claim instant). An ``active`` run is now claimable only once its
+    producer's heartbeat (``touch_run_liveness``, via ``run_heartbeat``) is older than the same
+    lease. A ``paused`` run has no producer by design, so the answer route's claim is unchanged.
     """
     row = await pool.fetchrow(
         """
@@ -2606,12 +2621,31 @@ async def claim_run(
         WHERE id = $1
           AND status IN ('active', 'paused')
           AND (claimed_at IS NULL OR claimed_at < now() - make_interval(secs => $2))
+          AND (status = 'paused' OR updated_at < now() - make_interval(secs => $2))
         RETURNING id
         """,
         run_id,
         lease_seconds,
     )
     return row is not None
+
+
+async def touch_run_liveness(pool: asyncpg.Pool, run_id: UUID) -> None:
+    """The producer's heartbeat: prove an ``active`` run still has someone driving it.
+
+    BUG-261106-03. ``claim_run`` treats an ``active`` run whose ``updated_at`` is fresher than
+    the lease as owned. ``updated_at`` rather than ``claimed_at`` because ``claimed_at`` is the
+    circuit breaker's wall-clock anchor (``load_run_budget``) and the run's displayed start;
+    renewing it would reset the duration cap on every beat. The ``set_updated_at`` trigger
+    stamps the same value; it is written explicitly so the statement means what it says.
+
+    ``status = 'active'`` only: a paused run must never look owned, or the answer route's
+    claim would wait out the lease before re-driving a person's answer.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs SET updated_at = now() WHERE id = $1 AND status = 'active'",
+        run_id,
+    )
 
 
 # ── harness_audit (this table's own column IS run_id — correct) ──────────────

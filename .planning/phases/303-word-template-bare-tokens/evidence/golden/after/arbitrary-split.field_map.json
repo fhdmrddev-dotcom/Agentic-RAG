@@ -1,0 +1,16 @@
+{
+ "scalars": {
+  "client_name": {
+   "source_chunk_id": "chunk-1",
+   "source_doc": "doc.pdf",
+   "source_page": 1,
+   "value": "Acme & Co"
+  },
+  "report_title": {
+   "source_chunk_id": "chunk-2",
+   "source_doc": "doc.pdf",
+   "source_page": 2,
+   "value": "Q3 <Review>"
+  }
+ }
+}

@@ -1,0 +1,12 @@
+== docxtpl_bare verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 2, "error": null}
+    {"body": ["Body: {'value': 'Ann', 'source_chunk_id': 'c1', 'source_doc': 'd.pdf', 'source_page': 2}"], "header": ["Header: {'value': 'Ann', 'source_chunk_id': 'c1', 'source_doc': 'd.pdf', 'source_page': 2}"], "footer": ["Footer: {'value': 'Ann', 'source_chunk_id': 'c1', 'source_doc': 'd.pdf', 'source_page': 2}"], "cells": ["Cell: {'value': 'Ann', 'source_chunk_id': 'c1', 'source_doc': 'd.pdf', 'source_page': 2}\n", "NESTED>Nested: {'value': 'Ann', 'source_chunk_id': 'c1', 'source_doc': 'd.pdf', 'source_page': 2}", "{'value': 'Late vendor', 'source_chunk_id': 'c2', 'source_doc': None, 'source_page': None}", ""]}
+== docxtpl_value verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== docxtpl_default verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: Ann"]}
+== run_replace_bare_spaced verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: "], "header": ["Header: "], "footer": ["Footer: "], "cells": ["Cell: \n", "NESTED>Nested: {{ name }}"]}
+== run_replace_bare_tight verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: Ann"], "header": ["Header: Ann"], "footer": ["Footer: Ann"], "cells": ["Cell: Ann\n", "NESTED>Nested: {{name}}"]}
+== run_replace_value verdict: {"rendered": true, "opened": true, "residual_clean": true, "residual_tags": [], "documented_limit": null, "rows": 1, "error": null}
+    {"body": ["Body: "], "header": ["Header: "], "footer": ["Footer: "], "cells": ["Cell: \n", "NESTED>Nested: {{ name.value }}"]}
