@@ -289,6 +289,45 @@ describe("usePublishAttempt — following (D-19)", () => {
   })
 })
 
+describe("usePublishAttempt — a read slower than the poll interval (308.1 review WR-01)", () => {
+  /** A read that answers (or fails) `ms` after it is sent. */
+  function slow<T>(ms: number, settle: () => Promise<T>): () => Promise<T> {
+    return () => new Promise<T>((resolve, reject) => {
+      setTimeout(() => settle().then(resolve, reject), ms)
+    })
+  }
+
+  it("a 4 s read on a 3 s poll still lands: the verdict shows", async () => {
+    // Every tick used to bump the request counter, so with every GET slower than POLL_MS
+    // the next tick invalidated the read in flight and NO read ever landed (the starved
+    // 1-vCPU host this phase exists for).
+    const { hook, read } = setup(() => Promise.resolve(running()))
+    await flush()
+    read.mockImplementation(slow(4_000, () => Promise.resolve(done(verdict()))))
+    await flush(20_000)
+    expect(hook.result.current.phase).toBe("done")
+    expect(hook.result.current.outcome).toEqual({ kind: "verdict", verdict: { ...verdict(), state: null } })
+  })
+
+  it("slow FAILED reads still count: the follow-error line becomes reachable", async () => {
+    const { hook, read } = setup(() => Promise.resolve(running()))
+    await flush()
+    read.mockImplementation(slow(4_000, () => Promise.reject(httpError(502))))
+    await flush(20_000)
+    expect(hook.result.current.phase).toBe("running")
+    expect(hook.result.current.followError).toBe(true)
+  })
+
+  it("no second read is sent while one is still pending", async () => {
+    const { read } = setup(() => Promise.resolve(running()))
+    await flush()
+    const before = read.mock.calls.length
+    read.mockImplementation(slow(10_000, () => Promise.resolve(running())))
+    await flush(9_000) // ticks at 3 s, 6 s and 9 s: only the first sends
+    expect(read.mock.calls.length).toBe(before + 1)
+  })
+})
+
 describe("usePublishAttempt — the clock (D-21)", () => {
   it("while following, elapsed is computed from the server's started_at", async () => {
     const { hook, read } = setup(() => Promise.resolve(running()))
