@@ -71,6 +71,7 @@ async def run_tail_stages(
     terminal_status: str,
     tool_schemas,
     stage0_token,
+    recorded_judge: dict | None = None,
 ) -> dict:
     """Every publish stage AFTER the golden run returned: the structural gate, the D-214-11
     resolved-argument check, the judge (stage 4), the flip (stage 5) and the success notes.
@@ -78,18 +79,26 @@ async def run_tail_stages(
     Moved verbatim from ``publish_service.publish_workflow`` (Phase 308.1-01, D-02); the
     parameters are exactly the locals that body read from ``publish_workflow``'s scope.
     Returns the structured verdict and, like the orchestration it was cut from, never raises.
+
+    ``recorded_judge`` (308.1 review WR-02) is this run's own ``judge_verdict`` receipt, passed
+    only by a RECOVERED tail whose dead predecessor already judged. The judge already ran and its
+    spend is already persisted, so the judge call, ``persist_run_usage``, the ``judge_verdict``
+    receipt and the ``publish_attempted`` receipt are NOT repeated (D-17: receipts once); the
+    recorded outcome decides the block or the flip. ``None`` (every other caller) is the path
+    exactly as moved.
     """
     from app.db.workflows import publish_definition  # noqa: PLC0415 — was publish_workflow's import
     from app.services.harness import publish_service as _ps  # noqa: PLC0415
 
     # The attempt now has a real run_id (the documented receipt-keying choice).
-    await _ps._safe_audit(
-        pool,
-        golden_run_id,
-        user_id=user_id,
-        event_type="publish_attempted",
-        metadata={"definition_id": str(definition_id), "golden_run_id": str(golden_run_id)},
-    )
+    if recorded_judge is None:
+        await _ps._safe_audit(
+            pool,
+            golden_run_id,
+            user_id=user_id,
+            event_type="publish_attempted",
+            metadata={"definition_id": str(definition_id), "golden_run_id": str(golden_run_id)},
+        )
 
     # A golden run that FAILED a structural gate (citations / integrity) during the
     # run never reaches the judge — block at the structural_gate stage with the run id.
@@ -146,73 +155,78 @@ async def run_tail_stages(
         )
 
     # ── stage 4: the judge verdict (the QUAL-01 hard blocker) ────────────────────
-    # IN-04: forward the run owner's effective settings to the judge shot (the SAME
-    # cached read the golden run used — D-v2.5-01) instead of user_settings=None, so the
-    # judge provider's gateway key/config resolution is owner-bound. Best-effort: a load
-    # failure degrades to None (the judge still resolves an independent forceable model).
-    owner_settings = None
-    try:
-        from app.models.user_settings import load_user_settings  # function-local
+    if recorded_judge is not None:
+        # WR-02: a recovered tail whose predecessor already judged. No second judge call, no
+        # second persist of its tokens, no second judge_verdict receipt.
+        verdict = recorded_judge
+    else:
+        # IN-04: forward the run owner's effective settings to the judge shot (the SAME
+        # cached read the golden run used — D-v2.5-01) instead of user_settings=None, so the
+        # judge provider's gateway key/config resolution is owner-bound. Best-effort: a load
+        # failure degrades to None (the judge still resolves an independent forceable model).
+        owner_settings = None
+        try:
+            from app.models.user_settings import load_user_settings  # function-local
 
-        owner_settings = load_user_settings(str(user_id))
-    except Exception:  # noqa: BLE001 — judge falls back to its independent model resolution
-        logger.warning(
-            "publish: owner settings load failed for %s (judge shot)", user_id, exc_info=True
+            owner_settings = load_user_settings(str(user_id))
+        except Exception:  # noqa: BLE001 — judge falls back to its independent model resolution
+            logger.warning(
+                "publish: owner settings load failed for %s (judge shot)", user_id, exc_info=True
+            )
+        # Phase 256 round 1 (METER-06 / SC#4, D-256-18 Option A) — the judge shot's spend.
+        _judge_usage: dict = {}
+        verdict = await _ps._judge_golden_output(
+            definition=definition,
+            final_output=final_output,
+            pool=pool,
+            owner_settings=owner_settings,
+            usage_box=_judge_usage,
         )
-    # Phase 256 round 1 (METER-06 / SC#4, D-256-18 Option A) — the judge shot's spend.
-    _judge_usage: dict = {}
-    verdict = await _ps._judge_golden_output(
-        definition=definition,
-        final_output=final_output,
-        pool=pool,
-        owner_settings=owner_settings,
-        usage_box=_judge_usage,
-    )
-    # ⭐ THE JUDGE'S SPEND BECOMES DURABLE HERE, AND THIS IS THE ONLY PLACE IT CAN.
-    # ``_judge_golden_output`` has no ctx and no live ``run_usage_box``: the golden run's
-    # box was read and finalized by ``_drive_golden_run``'s own ``finally`` BEFORE this
-    # stage runs, so the in-run validator's ``_record_run_usage`` shape is unavailable
-    # here. ``pool`` and ``golden_run_id`` are in scope; nothing else is.
-    #
-    # ⛔ ``golden_run_id``, NEVER ``_producer_id``. ``golden_run_id`` is a
-    # ``workflow_runs`` row (created by ``create_workflow_run`` in ``_drive_golden_run``)
-    # — the grain ``persist_run_usage`` writes and the grain ``token_coverage`` lives on.
-    # ``_producer_id`` is the separate ``runs`` shell, and D-256-03 forbids mixing the
-    # two: a workflow figure written onto a ``runs`` row can never afterwards be summed
-    # honestly against either grain.
-    #
-    # ⚠ ABOVE THE ``_safe_audit`` AND ABOVE THE ``_block`` RETURN ~15 LINES DOWN. A
-    # BLOCKED publish is precisely the one whose money is most worth recording — nothing
-    # else about that run became durable — so a persist placed below the block would
-    # lose the judge spend of every publish the gauntlet refused.
-    #
-    # ⚠ NEW BRANCHES: 1, and it is ``persist_run_usage``'s own falsy-delta guard
-    # reached through a local ``if`` rather than a new code path — a judge that reported
-    # no usage issues NO statement, because ``NULL`` means never measured and ``0``
-    # means measured as zero (D-256-06).
-    if _judge_usage:
-        from app.db.workflows import persist_run_usage  # function-local (file convention)
+        # ⭐ THE JUDGE'S SPEND BECOMES DURABLE HERE, AND THIS IS THE ONLY PLACE IT CAN.
+        # ``_judge_golden_output`` has no ctx and no live ``run_usage_box``: the golden run's
+        # box was read and finalized by ``_drive_golden_run``'s own ``finally`` BEFORE this
+        # stage runs, so the in-run validator's ``_record_run_usage`` shape is unavailable
+        # here. ``pool`` and ``golden_run_id`` are in scope; nothing else is.
+        #
+        # ⛔ ``golden_run_id``, NEVER ``_producer_id``. ``golden_run_id`` is a
+        # ``workflow_runs`` row (created by ``create_workflow_run`` in ``_drive_golden_run``)
+        # — the grain ``persist_run_usage`` writes and the grain ``token_coverage`` lives on.
+        # ``_producer_id`` is the separate ``runs`` shell, and D-256-03 forbids mixing the
+        # two: a workflow figure written onto a ``runs`` row can never afterwards be summed
+        # honestly against either grain.
+        #
+        # ⚠ ABOVE THE ``_safe_audit`` AND ABOVE THE ``_block`` RETURN ~15 LINES DOWN. A
+        # BLOCKED publish is precisely the one whose money is most worth recording — nothing
+        # else about that run became durable — so a persist placed below the block would
+        # lose the judge spend of every publish the gauntlet refused.
+        #
+        # ⚠ NEW BRANCHES: 1, and it is ``persist_run_usage``'s own falsy-delta guard
+        # reached through a local ``if`` rather than a new code path — a judge that reported
+        # no usage issues NO statement, because ``NULL`` means never measured and ``0``
+        # means measured as zero (D-256-06).
+        if _judge_usage:
+            from app.db.workflows import persist_run_usage  # function-local (file convention)
 
-        await persist_run_usage(
+            await persist_run_usage(
+                pool,
+                golden_run_id,
+                input_delta=_judge_usage.get("input_tokens"),
+                output_delta=_judge_usage.get("output_tokens"),
+            )
+        # The verdict is recorded REGARDLESS of pass/fail (governance — Phase 107).
+        await _ps._safe_audit(
             pool,
             golden_run_id,
-            input_delta=_judge_usage.get("input_tokens"),
-            output_delta=_judge_usage.get("output_tokens"),
+            user_id=user_id,
+            event_type="judge_verdict",
+            metadata={
+                "definition_id": str(definition_id),
+                "overall_passed": bool(verdict.get("overall_passed")),
+                "overall_score": verdict.get("overall_score"),
+                "summary": verdict.get("summary"),
+                "failure": verdict.get("failure"),
+            },
         )
-    # The verdict is recorded REGARDLESS of pass/fail (governance — Phase 107).
-    await _ps._safe_audit(
-        pool,
-        golden_run_id,
-        user_id=user_id,
-        event_type="judge_verdict",
-        metadata={
-            "definition_id": str(definition_id),
-            "overall_passed": bool(verdict.get("overall_passed")),
-            "overall_score": verdict.get("overall_score"),
-            "summary": verdict.get("summary"),
-            "failure": verdict.get("failure"),
-        },
-    )
 
     if verdict.get("failure") or verdict.get("overall_passed") is not True:
         return await _ps._block(

@@ -251,9 +251,11 @@ async def test_the_verdict_is_written_once_and_only_from_finishing():
         run_id = await _insert(conn, metadata={"publish": _record("running")})
         verdict = {"published": False, "blocked_stage": "judge", "golden_run_id": str(run_id)}
         # Not claimed yet: still ``running``, so the verdict write refuses.
-        assert await finish_publish_attempt(conn, run_id, verdict) is False
-        assert await claim_publish_tail(conn, run_id, LEASE) is not None
-        assert await finish_publish_attempt(conn, run_id, verdict) is True
+        assert await finish_publish_attempt(conn, run_id, verdict, token="") is False
+        claim = await claim_publish_tail(conn, run_id, LEASE)
+        assert claim is not None
+        token = claim["finishing_token"]  # 308.1 review WR-02: the owner's token
+        assert await finish_publish_attempt(conn, run_id, verdict, token=token) is True
         rec = await _publish_of(conn, run_id)
         assert rec["state"] == "done"
         assert rec["verdict"] == verdict
@@ -263,7 +265,7 @@ async def test_the_verdict_is_written_once_and_only_from_finishing():
         )
         assert kind == "object"
         # A second write changes nothing.
-        assert await finish_publish_attempt(conn, run_id, {"published": True}) is False
+        assert await finish_publish_attempt(conn, run_id, {"published": True}, token=token) is False
         assert (await _publish_of(conn, run_id))["verdict"] == verdict
     finally:
         await conn.close()

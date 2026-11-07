@@ -500,6 +500,7 @@ async def finish_attempt_tail(
     from app.config import settings  # noqa: PLC0415
     from app.db.workflows import (  # noqa: PLC0415
         claim_publish_tail,
+        find_publish_receipt,
         finish_publish_attempt,
         load_publish_attempt,
         load_run_phases,
@@ -518,6 +519,15 @@ async def finish_attempt_tail(
     if record is None:
         logger.info("publish: the tail of golden run %s belongs to another claim", run_id)
         return None
+    # 308.1 review WR-02: the claim's OWNER token. Only it refreshes the claim while the tail
+    # runs (so a slow judge is never re-claimed by another worker) and only it records the
+    # verdict (so a taken-over claim's late write is a no-op).
+    token = record.get("finishing_token") or ""
+    beat = (
+        _spawn(_beat_tail(run_id, pool=pool, token=token), name=f"publish-tail-beat-{run_id}")
+        if token
+        else None
+    )
 
     try:
         attempt = await load_publish_attempt(pool, run_id)
@@ -575,6 +585,11 @@ async def finish_attempt_tail(
             tool_schemas = await _ps._bound_tool_schemas(
                 definition, definition_id=definition_id, pool=pool
             )
+            # WR-02: a recovered tail whose dead predecessor already judged reuses that judge's
+            # recorded verdict: no second judge call, no second spend, no repeated receipts.
+            recorded = (
+                await find_publish_receipt(pool, run_id, "judge_verdict") if recovered else None
+            )
             verdict = await _ps.run_tail_stages(
                 definition_id=definition_id,
                 definition=definition,
@@ -586,10 +601,14 @@ async def finish_attempt_tail(
                 terminal_status=terminal_status,
                 tool_schemas=tool_schemas,
                 stage0_token=record.get("stage0_token"),
+                **({"recorded_judge": recorded} if recorded is not None else {}),
             )
     except Exception:  # noqa: BLE001 — the claim lapses; the stale-finishing recovery re-runs it
         logger.exception("publish: the tail of golden run %s failed after its claim", run_id)
         return None
+    finally:
+        if beat is not None:
+            beat.cancel()
 
     # CR-02: the verdict write was outside any guard; one blip lost a computed verdict (possibly a
     # flip that already happened). One retry; if it still fails the record stays ``finishing``,
@@ -598,7 +617,11 @@ async def finish_attempt_tail(
     payload = jsonable_encoder(verdict)
     for attempt_no in (1, 2):
         try:
-            await finish_publish_attempt(pool, run_id, payload)
+            if not await finish_publish_attempt(pool, run_id, payload, token=token):
+                logger.warning(
+                    "publish: the claim on golden run %s was taken over; verdict not recorded here",
+                    run_id,
+                )
             break
         except Exception:  # noqa: BLE001
             logger.exception(
@@ -634,7 +657,39 @@ async def _recovered_verdict(pool, run_id, *, attempt, definition_id, user_id) -
                 version = row.get("version")
             logger.info("publish: golden run %s had already published v%s", run_id, version)
             return {"published": True, "version": version, "golden_run_id": run_id}
+
+    # 308.1 review WR-02: the dead tail had already DECIDED (``_block`` writes its
+    # ``publish_blocked`` receipt as it returns) and died before recording ``done``. That
+    # decision is the verdict; re-running would repeat the judge, its spend and its receipts.
+    blocked = await find_publish_receipt(pool, run_id, "publish_blocked")
+    if blocked is not None and blocked.get("blocked_stage"):
+        logger.info("publish: golden run %s had already been refused; recording it", run_id)
+        return {
+            "published": False,
+            "blocked_stage": blocked.get("blocked_stage"),
+            "named_failures": blocked.get("named_failures") or [],
+            "golden_run_id": run_id,
+            "blocked_step": blocked.get("blocked_step"),
+        }
     return None
+
+
+async def _beat_tail(run_id, *, pool, token: str) -> None:
+    """WR-02: keep the tail claim fresh while its owner works (a third of the lease apart).
+
+    ``touch_publish_tail`` writes only while ``token`` is still the claim's, so a beat after a
+    take-over changes nothing; the owner cancels the beat when the tail ends. Never raises."""
+    from app.config import settings  # noqa: PLC0415
+    from app.db.workflows import touch_publish_tail  # noqa: PLC0415
+
+    every = max(float(settings.harness_resume_lease_seconds) / 3.0, 0.05)
+    while True:
+        await asyncio.sleep(every)
+        try:
+            if not await touch_publish_tail(pool, run_id, token):
+                return  # the claim is no longer ours (or the tail already recorded)
+        except Exception:  # noqa: BLE001 — a missed beat is retried on the next one
+            logger.warning("publish: could not refresh the tail claim of %s", run_id, exc_info=True)
 
 
 async def _stopped_run_verdict(pool, run_id, *, attempt, definition_id, user_id) -> dict | None:

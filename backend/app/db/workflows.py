@@ -51,7 +51,7 @@ import contextlib
 import json
 import logging
 from datetime import datetime
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import asyncpg
 
@@ -2821,6 +2821,11 @@ async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: in
     again: the worker that claimed it died mid-tail (the sweep's recovery arm, 308.1-03). A
     ``done`` record, a non-golden row and a record stored as a jsonb STRING scalar never match.
 
+    308.1 review WR-02: every claim stamps a FRESH owner token, ``finishing_token`` (a uuid made
+    here), returned with the record. Only that owner may refresh the claim
+    (:func:`touch_publish_tail`) or record the verdict (:func:`finish_publish_attempt`), so a
+    re-claim of a stale ``finishing`` record makes the old owner's late write a no-op.
+
     ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it takes a key
     and no user-supplied filter; ownership is the CALLER's (T-147-06). ``$N`` parameters only.
     """
@@ -2830,7 +2835,8 @@ async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: in
         SET metadata = jsonb_set(
                 metadata, '{publish}',
                 (metadata->'publish')
-                    || jsonb_build_object('state', 'finishing', 'finishing_at', now()))
+                    || jsonb_build_object('state', 'finishing', 'finishing_at', now(),
+                                          'finishing_token', $3::text))
         WHERE id = $1
           AND is_golden_run = true
           AND jsonb_typeof(metadata->'publish') = 'object'
@@ -2842,6 +2848,7 @@ async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: in
         """,
         run_id,
         lease_seconds,
+        str(uuid4()),
     )
     if row is None:
         return None
@@ -2849,13 +2856,43 @@ async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: in
     return publish if isinstance(publish, dict) else None
 
 
-async def finish_publish_attempt(pool: asyncpg.Pool, run_id: UUID, verdict: dict) -> bool:
-    """Record the attempt's verdict and mark it ``done`` — only from ``finishing``, so once.
+async def touch_publish_tail(pool: asyncpg.Pool, run_id: UUID, token: str) -> bool:
+    """The tail owner's beat: refresh ``finishing_at`` while the claim is still ITS (WR-02).
+
+    A judge slower than the lease used to let another worker's late pass re-claim a tail that was
+    still running (two judges, two flips). The owner refreshes its claim while it works; a token
+    that no longer matches (the claim was taken over) changes nothing and returns False.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS); ownership is
+    the CALLER's (T-147-06). ``$N`` only.
+    """
+    row = await pool.fetchrow(
+        """
+        UPDATE workflow_runs
+        SET metadata = jsonb_set(metadata, '{publish,finishing_at}', to_jsonb(now()))
+        WHERE id = $1
+          AND is_golden_run = true
+          AND jsonb_typeof(metadata->'publish') = 'object'
+          AND metadata->'publish'->>'state' = 'finishing'
+          AND metadata->'publish'->>'finishing_token' = $2
+        RETURNING id
+        """,
+        run_id,
+        token,
+    )
+    return row is not None
+
+
+async def finish_publish_attempt(
+    pool: asyncpg.Pool, run_id: UUID, verdict: dict, *, token: str
+) -> bool:
+    """Record the attempt's verdict and mark it ``done`` — only by the claim's OWNER, so once.
 
     ``verdict`` is the PLAIN DICT, already JSON-safe (``jsonable_encoder``: a ``UUID`` would
     make the codec's encoder raise — Pitfall 5); it lands as a jsonb OBJECT. Returns
-    True iff THIS call wrote it; a second call, or a call on a record that was never claimed,
-    changes nothing and returns False.
+    True iff THIS call wrote it; a second call, a call on a record that was never claimed, or a
+    call whose ``token`` is not the current claim's ``finishing_token`` (308.1 review WR-02: the
+    claim was taken over after it went stale) changes nothing and returns False.
 
     ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS); ownership is
     the CALLER's (T-147-06).
@@ -2871,11 +2908,13 @@ async def finish_publish_attempt(pool: asyncpg.Pool, run_id: UUID, verdict: dict
           AND is_golden_run = true
           AND jsonb_typeof(metadata->'publish') = 'object'
           AND metadata->'publish'->>'state' = 'finishing'
+          AND metadata->'publish'->>'finishing_token' = $3
         RETURNING id
         """,
         run_id,
         # THE PLAIN DICT — the codec encodes it.
         verdict,
+        token,
     )
     return row is not None
 

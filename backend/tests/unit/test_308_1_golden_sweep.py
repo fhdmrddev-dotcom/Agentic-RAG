@@ -477,7 +477,10 @@ async def test_a_recovered_failed_run_with_a_failed_step_takes_the_structural_ga
         await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock(), recovered=True)
     env.tail.assert_awaited_once()
     assert env.tail.await_args.kwargs["terminal_status"] == "failed"
-    env.find_receipt.assert_not_awaited()  # not published, so no receipt read is needed
+    # Not published, so no publish_succeeded read. 308.1 review WR-02: a recovered tail does read
+    # its own decision receipts (a recorded block, a recorded judge) before re-running anything.
+    kinds = [c.args[2] for c in env.find_receipt.await_args_list]
+    assert kinds == ["publish_blocked", "judge_verdict"]
 
 
 @pytest.mark.asyncio
