@@ -2271,6 +2271,28 @@ describe("308.1-04 — the publish screen follows a run the server is running", 
     expect(screen.getByTestId("publish-progress")).toHaveTextContent(PUBLISH_FOLLOW_COPY.starting)
   })
 
+  it("308.1 review WR-05 — the step is named from the RUN's snapshot (the server), never the current draft", async () => {
+    // D-24 lets the author close the modal, edit the draft and reopen while the run goes on. The
+    // run is still running the steps it STARTED with; the draft's step 2 is now a different
+    // step. The server names the active step from the run's own definition_snapshot.
+    mockedRead.mockResolvedValueOnce(
+      running({ progress: { step_index: 2, step_count: 5, step_name: "Read the brief", started_at: new Date(NOW - 75_000).toISOString() } }),
+    )
+    render(<PublishGauntlet definitionId="def-1" definition={DEF} />)
+    await open()
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(/^Step 2 of 5: Read the brief$/)
+    expect(screen.getByTestId("publish-progress").textContent).not.toContain("Collect evidence")
+  })
+
+  it("308.1 review WR-05 — an unnamed step in the run reads Step N of M, never a draft step's name", async () => {
+    mockedRead.mockResolvedValueOnce(
+      running({ progress: { step_index: 2, step_count: 5, step_name: null, started_at: new Date(NOW - 75_000).toISOString() } }),
+    )
+    render(<PublishGauntlet definitionId="def-1" definition={DEF} />)
+    await open()
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(/^Step 2 of 5$/)
+  })
+
   it("P4 finishing — the C-03 heading, the C-05 line, no finished run link yet", async () => {
     mockedRead.mockResolvedValue(running({ state: "finishing" }))
     render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
