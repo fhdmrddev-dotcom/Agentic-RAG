@@ -2781,32 +2781,52 @@ async def active_publish_attempt(
     return {"run_id": row["id"], "state": row["state"], "created_at": row["created_at"]}
 
 
+#: 308.1 review WR-04 — the longest a publish POST waits for another POST on the same draft to
+#: finish its check-and-create (a thread insert, a scope resolve, the run insert and the record
+#: write: normally well under a second). The waiter pins one pool connection while it waits, so
+#: the wait is BOUNDED.
+_PUBLISH_LOCK_WAIT_SECONDS = 10.0
+
+
+class PublishAttemptBusy(Exception):
+    """Another publish of this draft held its lock for longer than the bounded wait (WR-04)."""
+
+
 @contextlib.asynccontextmanager
-async def publish_attempt_lock(pool: asyncpg.Pool, definition_id: UUID):
+async def publish_attempt_lock(
+    pool: asyncpg.Pool, definition_id: UUID, *, wait_seconds: float = _PUBLISH_LOCK_WAIT_SECONDS
+):
     """Hold a Postgres advisory lock keyed on the draft for the check-and-create (D-10).
 
     Two workers can each take a publish POST for the same draft at the same instant; without a
     lock both pass :func:`active_publish_attempt` and both start a golden run (double spend).
-    A SESSION advisory lock on ONE acquired connection serialises them across workers; the other
-    statements run on other pool connections while it is held. Released in ``finally``; asyncpg's
-    connection reset (``pg_advisory_unlock_all``) is the second net if the unlock itself fails.
+    One advisory lock on ONE acquired connection serialises them across workers; the other
+    statements run on other pool connections while it is held.
+
+    308.1 review WR-04: the lock is TRANSACTION-scoped (``pg_advisory_xact_lock``, like every
+    other advisory lock in this codebase) inside a transaction on the acquired connection, and
+    the wait is BOUNDED by a transaction-local ``lock_timeout``. The session lock it replaces
+    waited with no timeout while pinning a pool connection, and the holder needs OTHER pool
+    connections to finish, so enough concurrent POSTs on one draft starved the pool. A waiter that
+    gives up raises :class:`PublishAttemptBusy` with its connection already returned; the lock
+    ends with the transaction (commit, or rollback when the body raises), so nothing is left held.
 
     The key is ``hashtextextended(<definition id>, 3081)`` — ``$1`` parameter only (T-091-03).
     """
+    timeout_ms = max(1, int(wait_seconds * 1000))
     async with pool.acquire() as con:
-        await con.execute(
-            "SELECT pg_advisory_lock(hashtextextended($1::text, $2))",
-            str(definition_id),
-            _PUBLISH_LOCK_SALT,
-        )
-        try:
+        async with con.transaction():
+            # ``set_config(..., true)`` is ``SET LOCAL`` with a bind parameter ($N only).
+            await con.execute("SELECT set_config('lock_timeout', $1, true)", f"{timeout_ms}ms")
+            try:
+                await con.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1::text, $2))",
+                    str(definition_id),
+                    _PUBLISH_LOCK_SALT,
+                )
+            except asyncpg.exceptions.LockNotAvailableError as e:
+                raise PublishAttemptBusy("another publish of this workflow is still starting") from e
             yield
-        finally:
-            await con.execute(
-                "SELECT pg_advisory_unlock(hashtextextended($1::text, $2))",
-                str(definition_id),
-                _PUBLISH_LOCK_SALT,
-            )
 
 
 async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: int) -> dict | None:

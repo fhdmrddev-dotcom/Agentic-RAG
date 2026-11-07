@@ -160,6 +160,7 @@ async def begin_background_attempt(
     """
     from app.config import settings  # noqa: PLC0415
     from app.db.workflows import (  # noqa: PLC0415
+        PublishAttemptBusy,
         active_publish_attempt,
         publish_attempt_lock,
         write_publish_attempt,
@@ -208,6 +209,32 @@ async def begin_background_attempt(
                     "verdict": None,
                 },
             )
+    except PublishAttemptBusy as busy:
+        # 308.1 review WR-04: the lock wait is BOUNDED. Another POST on this draft held the lock
+        # past it, so that POST is creating the attempt right now: answer THAT attempt's handle
+        # (no second run). Nothing to answer means the holder failed; that is a sealed block.
+        logger.warning("publish: definition %s lock wait gave up (another POST)", definition_id)
+        try:
+            existing = await active_publish_attempt(
+                pool,
+                definition_id=definition_id,
+                user_id=user_id,
+                max_age_seconds=settings.harness_publish_max_seconds,
+                lease_seconds=settings.harness_resume_lease_seconds,
+            )
+        except Exception:  # noqa: BLE001
+            existing = None
+        if existing is not None:
+            return _running_handle(existing["run_id"], existing["state"])
+        return await _ps._block(
+            pool,
+            run_id=None,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="golden_run_error",
+            named_failures=[_error_words(busy)],
+            golden_run_id=None,
+        )
     except Exception as e:  # noqa: BLE001 — a failed start is a structured block, never a 500
         logger.exception("publish: golden run could not be started for definition %s", definition_id)
         if run_id is not None:
