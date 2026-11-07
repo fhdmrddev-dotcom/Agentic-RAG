@@ -607,6 +607,32 @@ export interface PublishVerdict {
    *  from a pre-288 server and `[]` for every workflow without a pause.
    */
   auto_answered?: { phase?: string | null; message: string }[]
+  /**
+   *  308.1 / D-08: where the attempt is. Absent = done; an old server never sends it, and a
+   *  terminal POST answer omits it on purpose. `running` / `finishing` arrive only on the 202
+   *  handle; the GET's nested `verdict.state` is `null`.
+   */
+  state?: "running" | "finishing" | "done" | null
+}
+
+/** 308.1-04 (D-20) — where a running golden run is, from `GET /workflows/{id}/publish`.
+ *  `step_index` is 1-based and `null` between steps; `step_name` is the AUTHORED name and
+ *  `null` when the author named nothing (never the slug); `started_at` is the run's
+ *  `created_at`, the anchor of the follow-view clock. */
+export interface PublishProgress {
+  step_index: number | null
+  step_count: number
+  step_name: string | null
+  started_at: string
+}
+
+/** 308.1-04 (D-20) — the caller's latest publish attempt for one draft. `verdict` is set
+ *  only when `state` is `done`; `progress` is `null` only for `none`. */
+export interface PublishAttempt {
+  state: "none" | "running" | "finishing" | "done"
+  golden_run_id: string | null
+  verdict: PublishVerdict | null
+  progress: PublishProgress | null
 }
 
 /** Phase 214 (STEP-03) — the OPTIONAL keys a publish-refusal entry may carry, so a refusal can
@@ -901,11 +927,14 @@ export interface DescribeReferenceBody {
   text: string
 }
 
-/** The 4 distinguished outcomes of POST /workflows/{id}/publish. A binary
+/** The 5 distinguished outcomes of POST /workflows/{id}/publish. A binary
  *  `200 = ok / else = error` handler is FORBIDDEN — a 200 can carry a BLOCK
- *  (`published:false`), and 400/404/409 each mean something distinct. */
+ *  (`published:false`), and 400/404/409 each mean something distinct.
+ *  308.1 (D-08): the 202 one (`running`) is a HANDLE, not a verdict — the golden run is
+ *  going on the server, and `GET /workflows/{id}/publish` follows it to its verdict. */
 export type PublishOutcome =
   | { kind: "verdict"; verdict: PublishVerdict }
+  | { kind: "running"; verdict: PublishVerdict }
   | { kind: "business_requirement"; verdict: PublishVerdict }
   | { kind: "not_found" }
   | { kind: "already_published" }

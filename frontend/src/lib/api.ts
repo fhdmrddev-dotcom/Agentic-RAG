@@ -263,6 +263,9 @@ export type {
   DescribeFormBody,
   DescribeReferenceBody,
   PublishOutcome,
+  // 308.1-04 (D-20) — the follow read's shape, TYPE-ONLY, beside its sibling.
+  PublishAttempt,
+  PublishProgress,
 } from "./api/knowledge"
 
 // ── library ─────────────────────────────────────────────────────────
@@ -311,6 +314,8 @@ export {
   deleteWorkflowCascade,
   generateWorkflow,
   publishWorkflow,
+  // 308.1-04 (D-20) — follows a publish the server is running (GET /workflows/{id}/publish).
+  getPublishAttempt,
 } from "./api/workflows"
 export type {
   WorkflowTemplateAsset,

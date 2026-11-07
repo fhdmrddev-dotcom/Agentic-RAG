@@ -13,7 +13,7 @@
 import { API_BASE, ApiError, entitlementRefusalMessage, getAuthHeaders, getAuthToken } from "./_core"
 import { EntitlementRefusalError } from "./_core"
 import type { RunOrigin } from "@/types"
-import type { GenerateResult, GenerateWorkflowBody, PublishOutcome, PublishVerdict, WorkflowDefinitionJSON, WorkflowDraftRow, WorkflowDraftWriteResult } from "./knowledge"
+import type { GenerateResult, GenerateWorkflowBody, PublishAttempt, PublishOutcome, PublishVerdict, WorkflowDefinitionJSON, WorkflowDraftRow, WorkflowDraftWriteResult } from "./knowledge"
 export class WorkflowConflictError extends Error {
   constructor(message = "workflow is published and cannot be modified") {
     super(message)
@@ -1268,8 +1268,12 @@ export async function generateWorkflow(
 
 /** POST /workflows/{id}/publish — run the 8-stage publish gauntlet. The client
  *  distinguishes the 4 HTTP outcomes and reads the SERVER verdict verbatim:
+ *   - 202 → {kind:"running"} (308.1 / D-08): the golden run started on the server; the
+ *     body is a HANDLE (`golden_run_id`, `state`), never a verdict. Follow it with
+ *     `getPublishAttempt`.
  *   - 200 → {kind:"verdict"}: the body tells pass (published:true) from BLOCK
- *     (published:false / blocked_stage set) — we DO NOT re-derive it.
+ *     (published:false / blocked_stage set) — we DO NOT re-derive it. A 200 with no
+ *     `state` key is done (an old server's synchronous answer, D-08).
  *   - 400 → {kind:"business_requirement"}: the verdict is in `detail`.
  *   - 404 → {kind:"not_found"}.
  *   - 409 → {kind:"already_published"}.
@@ -1287,6 +1291,10 @@ export async function publishWorkflow(
     body: JSON.stringify({ golden_input }),
     signal,
   })
+  if (res.status === 202) {
+    const verdict = (await res.json()) as PublishVerdict
+    return { kind: "running", verdict }
+  }
   if (res.status === 200) {
     const verdict = (await res.json()) as PublishVerdict
     return { kind: "verdict", verdict }
@@ -1310,6 +1318,24 @@ export async function publishWorkflow(
     if (tierMsg) throw new Error(tierMsg)
   }
   throw new Error(`Failed to publish workflow (status ${res.status})`)
+}
+
+/** GET /workflows/{id}/publish — 308.1-04 (D-20, D-21): where the caller's latest publish
+ *  attempt for this draft is (`none` / `running` / `finishing` / `done`), with its progress
+ *  and, when done, its verdict. Throws `ApiError(…, status)` on any non-2xx so a follower
+ *  can tell a 404 (the attempt or the draft is gone) from a transient failure. Shape copied
+ *  from `getWorkflowRun` (encoded path segment, auth headers). */
+export async function getPublishAttempt(
+  definitionId: string,
+  signal?: AbortSignal,
+): Promise<PublishAttempt> {
+  const headers = await getAuthHeaders()
+  const res = await fetch(`${API_BASE}/workflows/${encodeURIComponent(definitionId)}/publish`, {
+    headers,
+    signal,
+  })
+  if (!res.ok) throw new ApiError(`Failed to read the publish (status ${res.status})`, res.status)
+  return (await res.json()) as PublishAttempt
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
