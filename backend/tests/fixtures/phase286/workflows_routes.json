@@ -824,6 +824,12 @@
       ]
     },
     {
+      "path": "/workflows/{definition_id}/publish",
+      "methods": [
+        "GET"
+      ]
+    },
+    {
       "path": "/workflows/{workflow_id}/schedules",
       "methods": [
         "POST"

@@ -980,7 +980,7 @@ async def list_models():
     return {"models": models, "default": settings.llm_model}
 
 
-from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound, org_items, links, notifications, webhooks  # noqa: E402
+from app.api import threads, runs, documents, settings as settings_api, folders, kb, skills, audit, knowledge_health, feedback, sandbox_outputs, workspace, workspace_promote, retention, admin, panel, workflows, workflow_publish, workflow_runs, workflow_run_evidence, metadata_fields, document_views, document_search, document_relationships, classification_rules, document_governance, skill_tuner, skill_test_cases, evals, features, setup as setup_api, org, me_preferences, connectors, model_registry, schedules, document_queries, library, checked_queries, takeoff, sources, experts, api_docs, citation_checks, api_keys, inbound, org_items, links, notifications, webhooks  # noqa: E402
 from app.mcp import mcp_lifespan, register_mcp  # noqa: E402 — Phase 305 MCP-01
 
 app.include_router(threads.router)
@@ -1000,6 +1000,7 @@ app.include_router(retention.router)  # Phase 275 (RET-01..04) — retention pol
 app.include_router(admin.router)
 app.include_router(panel.router)  # Phase 085 D-085-23 — thread-scoped panel data endpoints
 app.include_router(workflows.router)  # Phase 092 MODE-01 — published-workflows picker feed
+app.include_router(workflow_publish.router)  # Phase 308.1 D-20 — GET /workflows/{id}/publish: the caller's latest publish attempt (state, verdict, progress); own module (D-04), shares the /workflows prefix, no path collides
 app.include_router(workflow_runs.router)  # Phase 188 RUNVIZ-03 — GET /workflow-runs/{id}: the one net-new read that gives a RUN an address (run + the definition version that RAN + the durable phase spine, D-188-14); ownership-gated 404 + require_canvas ALONE, path template registered in CANVAS_GATED_PATHS (D-188-15/16)
 app.include_router(workflow_run_evidence.router)  # Phase 289 VIS-03 — GET /workflow-runs/{id}/evidence: a FINISHED run's evidence for its owner or a member of its org (one access query, the same 404 for every miss); require_canvas ALONE, template in CANVAS_GATED_PATHS
 app.include_router(citation_checks.router)  # Phase 294 DEC-03 — GET/POST /citation-checks: on-demand citation verdicts

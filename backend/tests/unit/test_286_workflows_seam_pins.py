@@ -108,6 +108,17 @@ naming the 202 arm; its ``responses`` gain the ``202`` entry with the ``PublishV
 ``PublishVerdict`` schema gains the optional ``state`` property, ``running | finishing | done | null``);
 ``workflows_moved_ast.json`` +1 / −1 (the ``body_sha256`` of ``PublishVerdict``, for the one new field
 and its comment); ``workflows_routes.json`` showed no change.
+
+DELIBERATE RE-BASELINE (Phase 308.1-03, 2026-11-07, D-20, BUG-261107-01): ``GET
+/workflows/{definition_id}/publish`` is NEW — the caller's latest publish attempt (state, golden run,
+verdict, progress), the one read that follows the POST's 202. It lives in its OWN router
+(``api/workflow_publish.py``, D-04: ``api/workflows.py``'s split is owed), so ``workflows.router`` is
+unchanged and ``_EXPECTED_ROUTES`` is untouched; the new route appears only in the full app's
+``/workflows*`` slice. ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +141 / −0 (the ``get`` operation on the existing publish path, and the two
+new schemas ``PublishAttempt`` and ``PublishProgress``; nothing existing changed);
+``workflows_routes.json`` +6 / −0 (the one GET row in the app slice, after the published-list rows and
+before the schedules rows); ``workflows_moved_ast.json`` showed no change.
 """
 
 from __future__ import annotations

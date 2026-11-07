@@ -7633,6 +7633,53 @@
       }
      }
     }
+   },
+   "get": {
+    "tags": [
+     "workflows"
+    ],
+    "summary": "Get Publish Attempt",
+    "description": "The caller's latest publish attempt on this draft: state, golden run, verdict, progress.\n\n``404 \"workflow not found\"`` for a missing draft or one the caller does not own (the POST's\nanswer, byte for byte); ``200 {state: \"none\"}`` when the owner has never published it in the\nbackground. ``definition_id`` is a path ``UUID`` (422 on a malformed id).",
+    "operationId": "get_publish_attempt_workflows__definition_id__publish_get",
+    "security": [
+     {
+      "HTTPBearer": []
+     }
+    ],
+    "parameters": [
+     {
+      "name": "definition_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Definition Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublishAttempt"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
    }
   },
   "/workflows": {
@@ -28860,6 +28907,58 @@
     ],
     "title": "ProviderUpdate"
    },
+   "PublishAttempt": {
+    "properties": {
+     "state": {
+      "type": "string",
+      "enum": [
+       "none",
+       "running",
+       "finishing",
+       "done"
+      ],
+      "title": "State"
+     },
+     "golden_run_id": {
+      "anyOf": [
+       {
+        "type": "string",
+        "format": "uuid"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Golden Run Id"
+     },
+     "verdict": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PublishVerdict"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     },
+     "progress": {
+      "anyOf": [
+       {
+        "$ref": "#/components/schemas/PublishProgress"
+       },
+       {
+        "type": "null"
+       }
+      ]
+     }
+    },
+    "type": "object",
+    "required": [
+     "state"
+    ],
+    "title": "PublishAttempt",
+    "description": "The caller's latest publish attempt on a draft (D-20). Every field is declared: the\nresponse model drops anything undeclared."
+   },
    "PublishGate": {
     "properties": {
      "met": {
@@ -28931,6 +29030,48 @@
     ],
     "title": "PublishGate",
     "description": "GATE-01 publish-gate read model (Phase 136, computed by publish_gate_service).\n\n``met`` is recomputed from the NUMERIC ``eval_runs.passed_count`` / ``measured_count``\ncolumns (D-03 \u2014 never the ``verdict_summary`` display text) and bound to the skill's\nCURRENT instructions by content-equality (D-04). ``last_override`` is the most-recent\nowner-visible force-publish record for this skill (``{gate_state, created_at}``), or\nNone when never overridden (D-02/D-06)."
+   },
+   "PublishProgress": {
+    "properties": {
+     "step_index": {
+      "anyOf": [
+       {
+        "type": "integer"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Index"
+     },
+     "step_count": {
+      "type": "integer",
+      "title": "Step Count"
+     },
+     "step_name": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Step Name"
+     },
+     "started_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Started At"
+     }
+    },
+    "type": "object",
+    "required": [
+     "step_count",
+     "started_at"
+    ],
+    "title": "PublishProgress",
+    "description": "Where a publish attempt's golden run is. ``step_index`` is 1-based and ``None`` between\nsteps; ``step_name`` is the author's name for the step, ``None`` when they gave none."
    },
    "PublishRequest": {
     "properties": {

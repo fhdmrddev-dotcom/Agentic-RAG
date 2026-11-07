@@ -454,7 +454,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 9 / 5 / 128 (was `8 / 4 / 121`) | 299-05: pending flag (one const + one key) · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 67 / 34 / 3127 (was `65 / 33 / 2874`) | 308.1-02: six publish-attempt helpers + tail CAS · ⛔ |
+| `backend/app/db/workflows.py` | 68 / 34 / 3251 (was `67 / 34 / 3127`) | 308.1-03: four reads (two sweep finders, latest attempt, receipt) · ⛔ |
 | `backend/app/services/harness/publish_service.py` | 39 / 18 / 1143 (was `38 / 18 / 1053`) | 308.1-02: stages 0-2.6 in _pre_run; start_publish added · ⛔ |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
@@ -491,7 +491,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
 | `frontend/src/lib/api.ts` | 216 / 129 / 561 (was `215 / 128 / 556`) | 308.1-04: getPublishAttempt + PublishAttempt/PublishProgress beside siblings |
 | `frontend/src/types/index.ts` | 104 / 83 / 1690 (was `103 / 82 / 1688`) | 306-04: RunOrigin.kind + mcp; Thread.origin (types only) · seam OWED |
-| `backend/app/main.py` | 101 / 75 / 1056 (was `100 / 74 / 1024`) | 308-04: routers + WebhookDrainer lifespan (D-50); httpx log WARNING · ⛔ |
+| `backend/app/main.py` | 104 / 76 / 1095 (was `101 / 75 / 1056`) | 308.1-03: golden sweep first in both resume passes + one include · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
 | `backend/app/api/admin.py` | 45 / 18 / 2055 (was `44 / 17 / 2054`) | 304-04: one _FLAG_HUMAN_NAMES entry (mcp_enabled) · ⛔ |
 | `backend/app/api/settings.py` | 53 / 29 / 1523 (was `51 / 28 / 1425`) | 306-02: four outside knobs, one explicit bound each (D-36/D-35) |
