@@ -663,7 +663,10 @@ def test_the_warning_literal_appears_once_per_shell():
 _SHELL_FUNCTIONS = {
     "app/api/runs.py": ("_redrive_paused_workflow_run", "continue_run"),
     # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
-    "app/services/harness/publish_tail.py": ("_drive_golden_run",),
+    # Phase 308.1-02: ``_drive_golden_run`` is now the composition of three pieces; the shell is
+    # minted in ``_golden_ctx`` and terminalized in ``_drive_created``'s ``finally``, so the fence
+    # scans all three (re-pointed, not relaxed: the composition alone would read vacuously).
+    "app/services/harness/publish_tail.py": ("_drive_golden_run", "_golden_ctx", "_drive_created"),
     "app/services/unattended_launch.py": ("_drive_run",),  # Phase 293: moved with the code
 }
 

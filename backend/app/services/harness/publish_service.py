@@ -81,23 +81,22 @@ from app.services.harness.publish_tail import (  # noqa: E402,F401 — re-export
 )
 
 
-async def publish_workflow(
+async def _pre_run(
     *,
     definition_id: UUID,
     golden_input: str,
     user: dict,
     pool,
-    redis,
     supabase=None,
 ) -> dict:
-    """The D-07/D-08 publish orchestration. Returns the structured verdict.
+    """Stages 0, 1, 2, 2.5 and 2.6: every check that needs no run (Phase 308.1-02, D-07).
 
-    See the module docstring for the 6-stage flow. Never raises into the caller.
-    The route (Task 3) maps the structured result to HTTP:
-      - ``blocked_stage == "not_found"`` / ``"already_published"`` -> 404 / 409
-      - ``blocked_stage == "business_requirement"`` -> 400 (D-13)
-      - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``
-      - success -> 200 ``{published: True, version, golden_run_id}``
+    Cut out of :func:`publish_workflow` statement for statement, so the inline publish and the
+    background :func:`start_publish` run ONE copy of the cheap gates and every pre-run answer
+    stays byte-identical (``test_308_1_prerun_byte_identical.py``). Returns
+    ``{"block": <verdict>}`` (the verdict each stage returned before the cut, receipt and all)
+    or ``{"ready": {user_id, row, stage0_token, definition, tool_schemas}}``. ``golden_input`` is
+    not read by any of these stages; it is accepted so both callers hand over one argument set.
     """
     # Function-local heavy imports (Pitfall 4 — no engine/render import at module top).
     # IN-01: create_workflow_run / load_run_phases / write_audit are used only by the
@@ -115,12 +114,12 @@ async def publish_workflow(
 
     user_id_raw = user.get("id")
     if user_id_raw is None:
-        return {
+        return {"block": {
             "published": False,
             "blocked_stage": "not_found",
             "named_failures": ["no authenticated user"],
             "golden_run_id": None,
-        }
+        }}
     user_id = UUID(user_id_raw) if isinstance(user_id_raw, str) else user_id_raw
 
     # ── stage 0: load + owner-check (V4 — a non-owner gets not_found -> 404) ──────
@@ -129,12 +128,12 @@ async def publish_workflow(
         # not-found AND cross-user collapse to the SAME structured block (no existence
         # leak — T-102-05-06); the route 404s uniformly. NOT a publish_attempted (no
         # row was even owned to attempt against).
-        return {
+        return {"block": {
             "published": False,
             "blocked_stage": "not_found",
             "named_failures": ["workflow not found"],
             "golden_run_id": None,
-        }
+        }}
 
     # Phase 186 (D-186-10) — the draft AS IT WAS WHEN WE STARTED CHECKING IT. Captured
     # here, spent at stage 5, minutes of golden run later. ``row.get`` and NEVER a
@@ -146,7 +145,7 @@ async def publish_workflow(
     stage0_token = row.get("token")
 
     if row.get("status") != "draft":
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -154,7 +153,7 @@ async def publish_workflow(
             stage="already_published",
             named_failures=["only a draft can be published"],
             golden_run_id=None,
-        )
+        )}
 
     raw_definition = row.get("definition")
     if isinstance(raw_definition, str):
@@ -167,7 +166,7 @@ async def publish_workflow(
     try:
         definition = WorkflowDefinition.model_validate(raw_definition)
     except Exception as e:  # noqa: BLE001 — a malformed definition is a structured block, not a 500
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -175,13 +174,13 @@ async def publish_workflow(
             stage="definition_invalid",
             named_failures=[f"definition failed validation: {e}"],
             golden_run_id=None,
-        )
+        )}
 
     # ── stage 1: business_requirement present? (D-13 publish-time invariant) ─────
     # The predicate is the SHARED grounding.business_requirement_missing (Phase 182) —
     # behavior identical, now one source with the canvas /validate seam.
     if business_requirement_missing(definition):
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -190,7 +189,7 @@ async def publish_workflow(
             # ONE source with the /validate seam — see the constant's docblock.
             named_failures=[BUSINESS_REQUIREMENT_MISSING_MESSAGE],
             golden_run_id=None,
-        )
+        )}
 
     # ── stage 2: structural lint (pure; short-circuits BEFORE the golden run) ─────
     #
@@ -214,7 +213,7 @@ async def publish_workflow(
     )
     lint_errors = lint_workflow(definition, tool_schemas=tool_schemas)
     if lint_errors:
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -222,7 +221,7 @@ async def publish_workflow(
             stage="lint",
             named_failures=[_lint_named_failure(e) for e in lint_errors],
             golden_run_id=None,
-        )
+        )}
 
     # ── stage 2.5: interactive-phase pre-run block (WR-04 — lint-class) ──────────
     # A synchronous publish cannot validate interactive phases: an llm_human_input
@@ -257,7 +256,7 @@ async def publish_workflow(
     # concrete condition which stops this deferral evaporating a second time.
     interactive_failures = _interactive_phase_failures(definition)
     if interactive_failures:
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -265,7 +264,7 @@ async def publish_workflow(
             stage="interactive_phase",
             named_failures=interactive_failures,
             golden_run_id=None,
-        )
+        )}
 
     # ── stage 2.6: grounding fidelity (Phase 182 gap closure — the SHARED rules) ──
     # ORDERING RATIONALE. This is the LAST of the cheap static gates and it runs BEFORE
@@ -293,7 +292,7 @@ async def publish_workflow(
         supabase=supabase,
     )
     if grounding_failures:
-        return await _block(
+        return {"block": await _block(
             pool,
             run_id=None,
             user_id=user_id,
@@ -301,7 +300,52 @@ async def publish_workflow(
             stage="grounding_fidelity",
             named_failures=grounding_failures,
             golden_run_id=None,
-        )
+        )}
+
+    return {
+        "ready": {
+            "user_id": user_id,
+            "row": row,
+            "stage0_token": stage0_token,
+            "definition": definition,
+            "tool_schemas": tool_schemas,
+        }
+    }
+
+
+async def publish_workflow(
+    *,
+    definition_id: UUID,
+    golden_input: str,
+    user: dict,
+    pool,
+    redis,
+    supabase=None,
+) -> dict:
+    """The D-07/D-08 publish orchestration. Returns the structured verdict.
+
+    See the module docstring for the 6-stage flow. Never raises into the caller.
+    The route (Task 3) maps the structured result to HTTP:
+      - ``blocked_stage == "not_found"`` / ``"already_published"`` -> 404 / 409
+      - ``blocked_stage == "business_requirement"`` -> 400 (D-13)
+      - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``
+      - success -> 200 ``{published: True, version, golden_run_id}``
+    """
+    # ── stages 0-2.6: the cheap pre-run gates, in ``_pre_run`` (Phase 308.1-02, D-07) ──────
+    pre = await _pre_run(
+        definition_id=definition_id,
+        golden_input=golden_input,
+        user=user,
+        pool=pool,
+        supabase=supabase,
+    )
+    if "block" in pre:
+        return pre["block"]
+    ready = pre["ready"]
+    user_id = ready["user_id"]
+    definition = ready["definition"]
+    tool_schemas = ready["tool_schemas"]
+    stage0_token = ready["stage0_token"]
 
     # ── stage 3: the REAL golden run (is_golden_run=True; no mocks, no opt-out) ───
     # WR-04 (T-102-09-03): the synchronous golden run is bounded by a publish-level
@@ -382,6 +426,52 @@ async def publish_workflow(
 # Back-compat alias — the Wave-0 test stubs assert ``hasattr(publish_service, "publish_workflow")``;
 # the route + the rest of the service call ``publish`` (the canonical name).
 publish = publish_workflow
+
+
+async def start_publish(
+    *,
+    definition_id: UUID,
+    golden_input: str,
+    user: dict,
+    pool,
+    redis,
+) -> dict:
+    """The publish the route calls (Phase 308.1-02, D-07 / D-08): the golden run in the BACKGROUND.
+
+    Stages 0-2.6 run here, in the request, exactly as :func:`publish_workflow` runs them, and a
+    block is returned as-is (byte-identical, no run created). When they pass, the golden run is
+    created, its attempt recorded on the run row, and its drive started as a background task;
+    the answer is the running handle ``{published: False, blocked_stage: None,
+    named_failures: [], golden_run_id, state: "running"}`` (or ``"finishing"``, when this
+    user's draft already has an attempt in flight, D-10). The verdict lands on the run row when
+    the run ends (``publish_attempt``). Never raises into the route.
+
+    :func:`publish_workflow` stays the inline reference composition: every existing publish
+    suite keeps proving the functions the background task runs.
+    """
+    pre = await _pre_run(
+        definition_id=definition_id,
+        golden_input=golden_input,
+        user=user,
+        pool=pool,
+        supabase=None,
+    )
+    if "block" in pre:
+        return pre["block"]  # D-07: byte-identical, and no golden run exists
+    ready = pre["ready"]
+
+    # Function-local: ``publish_attempt`` imports this module back (late-bound ``_ps.`` calls).
+    from app.services.harness import publish_attempt  # noqa: PLC0415
+
+    return await publish_attempt.begin_background_attempt(
+        definition_id=definition_id,
+        definition=ready["definition"],
+        golden_input=golden_input,
+        user_id=ready["user_id"],
+        stage0_token=ready["stage0_token"],
+        pool=pool,
+        redis=redis,
+    )
 
 
 # ── helpers ───────────────────────────────────────────────────────────────────

@@ -670,36 +670,53 @@ def _judge_named_failures(verdict: dict) -> list:
     return failures or [{"summary": "overall_passed is not True"}]
 
 
-async def _drive_golden_run(
+async def _golden_run_scope(definition, user_id, supabase) -> tuple:
+    """The run owner's effective settings, the ctx model and the project's folder scope.
+
+    Step 2 of the golden drive, cut out (Phase 308.1-02) so the background attempt can rebuild
+    the same scope for a run it did not create in this process. Returns
+    ``(owner_settings, ctx_model, folder_subtree_ids)``; the statements are the drive's own.
+    """
+    owner_settings = None
+    try:
+        from app.models.user_settings import load_user_settings
+
+        owner_settings = load_user_settings(str(user_id))
+    except Exception:  # noqa: BLE001 — fall back to phase-level model only
+        logger.warning("publish: owner settings load failed for %s", user_id, exc_info=True)
+    from app.services.sub_agent_models import resolve_workflow_ctx_model
+
+    ctx_model = resolve_workflow_ctx_model(owner_settings)
+
+    folder_subtree_ids = None
+    if definition.project_folder_id is not None:
+        from app.services.harness.scope import resolve_project_subtree
+
+        folder_subtree_ids = await resolve_project_subtree(
+            definition.project_folder_id, supabase=supabase, user_id=str(user_id)
+        )
+
+    return owner_settings, ctx_model, folder_subtree_ids
+
+
+async def _create_golden_run(
     *,
     definition_id: UUID,
     definition,
     golden_input: str,
     user_id: UUID,
     pool,
-    redis,
     supabase,
-) -> tuple[UUID, dict, str]:
-    """Create + drive a REAL golden run on the project KB (D-05). Returns
-    ``(run_id, final_output, terminal_status)``.
+) -> dict:
+    """Steps 1-3 of the golden drive: the org-scoped client, the ephemeral validation thread,
+    the owner's scope, the golden inputs and the ``workflow_runs`` row (``is_golden_run=True``).
 
-    The golden run needs a thread anchor (``create_workflow_run`` requires a
-    ``thread_id``). The simplest viable path (plan Task 2 note): create an EPHEMERAL
-    validation thread for the user, then build a minimal validation ctx mirroring the
-    resume-path ctx (``harness_engine._build_resume_context`` — the canonical
-    out-of-threads.py ctx template; G-5 forbids touching threads.py).
-
-    The ctx carries the service-role supabase (owner-scoped retrieval enforced by the
-    resolved ``folder_subtree_ids``), the run owner's effective settings + resolved
-    model (resolve-never-mutate), and the project's resolved folder scope so the
-    golden run retrieves ONLY the workflow's bound KB.
+    Cut out of ``_drive_golden_run`` (Phase 308.1-02) without changing a statement, so the
+    publish request can create the run, record the attempt on it and return while a background
+    task drives it. Returns ``run_id, thread_id, org_id, supabase, owner_settings, ctx_model,
+    folder_subtree_ids, inputs``.
     """
-    import asyncio
-    from types import SimpleNamespace
-
-    from app.config import settings
-    from app.db.workflows import create_workflow_run, load_run_phases
-    from app.services.harness_engine import _emit, run_workflow
+    from app.db.workflows import create_workflow_run
     from app.services.harness import publish_service as _ps  # noqa: PLC0415
 
     # The org-scoped service-role client — resolved through the ONE shared helper (Phase 182
@@ -732,24 +749,9 @@ async def _drive_golden_run(
     thread_id = thread_resp.data[0]["id"]
 
     # ── 2. resolve the run owner's effective settings + ctx model + folder scope ──
-    owner_settings = None
-    try:
-        from app.models.user_settings import load_user_settings
-
-        owner_settings = load_user_settings(str(user_id))
-    except Exception:  # noqa: BLE001 — fall back to phase-level model only
-        logger.warning("publish: owner settings load failed for %s", user_id, exc_info=True)
-    from app.services.sub_agent_models import resolve_workflow_ctx_model
-
-    ctx_model = resolve_workflow_ctx_model(owner_settings)
-
-    folder_subtree_ids = None
-    if definition.project_folder_id is not None:
-        from app.services.harness.scope import resolve_project_subtree
-
-        folder_subtree_ids = await resolve_project_subtree(
-            definition.project_folder_id, supabase=supabase, user_id=str(user_id)
-        )
+    owner_settings, ctx_model, folder_subtree_ids = await _golden_run_scope(
+        definition, user_id, supabase
+    )
 
     # ── 3a-pre. BUG-260828-10 — the golden run must ANSWER what the workflow asks for ──
     #
@@ -792,6 +794,45 @@ async def _drive_golden_run(
         is_golden_run=True,
     )
 
+    return {
+        "run_id": run_id,
+        "thread_id": thread_id,
+        "org_id": _golden_run_org_id,
+        "supabase": supabase,
+        "owner_settings": owner_settings,
+        "ctx_model": ctx_model,
+        "folder_subtree_ids": folder_subtree_ids,
+        "inputs": golden_inputs,
+    }
+
+
+async def _golden_ctx(
+    *,
+    run_id,
+    thread_id,
+    user_id,
+    org_id,
+    owner_settings,
+    ctx_model,
+    golden_inputs: dict,
+    folder_subtree_ids,
+    supabase,
+    pool,
+    redis,
+) -> tuple:
+    """The producer shell plus THE ONE golden ctx in the tree. Returns ``(ctx, producer_id)``.
+
+    Steps 3b-4 of the golden drive, cut out (Phase 308.1-02) so every drive of a golden run (the
+    inline publish, the background first drive, and the re-drive after a dead worker in
+    308.1-03) builds its ctx HERE and nowhere else (D-12 / D-15). ``org_id`` is the producer
+    shell's spend ATTRIBUTION only; the ctx still withholds it (the Phase 190 fence below).
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    from app.config import settings
+    from app.services.harness_engine import _emit
+
     # ── 3b. mint the producer-shell `runs` row (FK fix — mirrors _build_resume_context
     #        Facet C, 092-07). A harness sub-agent's parent_run_id FKs `runs.run_id`, so
     #        `ctx.producer_run_id` MUST be a real `runs` row — NOT the workflow_run id
@@ -801,7 +842,7 @@ async def _drive_golden_run(
     #        resume sites mint/borrow a real runs row; the publish path did not). The shell
     #        never makes an LLM call; placeholder model/provider are bookkeeping only.
     from uuid import uuid4
-    from app.db.runs import finalize_run, insert_run
+    from app.db.runs import insert_run
 
     _producer_id = uuid4()
     _thread_uuid = UUID(thread_id) if isinstance(thread_id, str) else thread_id
@@ -815,7 +856,7 @@ async def _drive_golden_run(
         model="unknown",
         provider="unknown",
         parent_run_id=None,
-        org_id=str(_golden_run_org_id) if _golden_run_org_id else None,
+        org_id=str(org_id) if org_id else None,
     )
 
     # ── 4. build the minimal validation ctx (mirrors _build_resume_context) ──────
@@ -858,6 +899,29 @@ async def _drive_golden_run(
         is_golden_run=True,
     )
 
+    return ctx, _producer_id
+
+
+async def _drive_created(
+    *,
+    run_id,
+    definition,
+    ctx,
+    producer_id,
+    user_id,
+    pool,
+    redis,
+) -> tuple[UUID, dict, str]:
+    """Steps 5-6 of the golden drive: run it, harvest it, and ALWAYS clean up on the way out.
+
+    Returns ``(run_id, final_output, terminal_status)``; an escape carries ``golden_run_id``.
+    Cut out of ``_drive_golden_run`` (Phase 308.1-02). One change in what it does:
+    ``finish_golden_run`` is skipped while the app is shutting down (see the ``finally``).
+    """
+    from app.db.runs import finalize_run
+    from app.db.workflows import load_run_phases
+    from app.services.harness_engine import run_workflow
+
     # ── 5+6. drive the real run end-to-end + harvest, ALWAYS terminalizing the
     #         producer shell on exit (no stranded 'streaming' row → the F2 self-heal
     #         stays intact; mirrors the resume caller's "MUST terminalize" contract). ──
@@ -898,13 +962,13 @@ async def _drive_golden_run(
                 # db/runs.py:93-99's contract. IDENTIFIERS ONLY (T-073-04 / T-256-14).
                 logger.warning(
                     "runs.usage missing for run=%s provider=%s model=%s",
-                    _producer_id,
+                    producer_id,
                     getattr(ctx, "provider", None),
                     getattr(ctx, "model", None),
                 )
             await finalize_run(
                 pool,
-                run_id=_producer_id,
+                run_id=producer_id,
                 status=_shell_status,
                 error=None,
                 completed_at=datetime.now(timezone.utc),
@@ -914,15 +978,84 @@ async def _drive_golden_run(
             )
         except Exception:  # noqa: BLE001 — shell cleanup never masks the run's own outcome
             logger.warning(
-                "publish: producer-shell finalize failed for %s", _producer_id, exc_info=True
+                "publish: producer-shell finalize failed for %s", producer_id, exc_info=True
             )
         # Phase 295 (D-20): the golden run's OWN row. ``find_resumable_runs`` excludes golden
         # runs, so a golden run that raised or hit the publish budget used to stay ``active``
         # forever. The helper ends it ``failed`` with words only if nothing else already ended
         # it, and never raises (shell cleanup never masks the run's own outcome).
         from app.services.harness.run_handoff import finish_golden_run  # noqa: PLC0415
+        from app.services.harness_engine import is_app_shutting_down  # noqa: PLC0415
 
-        await finish_golden_run(pool, run_id, user_id=user_id)
+        # ⛔ Phase 308.1-02 (Pitfall 9 / 096-09): a GRACEFUL SHUTDOWN (a deploy) cancels this task.
+        # Ending the run here would write "did not finish within its time limit" (false words)
+        # and close a run the next boot's golden sweep could re-drive (308.1-03). So during
+        # shutdown the row is left ``active``, exactly as ``run_handoff.resume_with_terminalize``
+        # leaves a resumed run. Any other exit, the budget's cancel included, still ends it with
+        # words (Phase 295).
+        if not is_app_shutting_down():
+            await finish_golden_run(pool, run_id, user_id=user_id)
+
+
+async def _drive_golden_run(
+    *,
+    definition_id: UUID,
+    definition,
+    golden_input: str,
+    user_id: UUID,
+    pool,
+    redis,
+    supabase,
+) -> tuple[UUID, dict, str]:
+    """Create + drive a REAL golden run on the project KB (D-05). Returns
+    ``(run_id, final_output, terminal_status)``.
+
+    The golden run needs a thread anchor (``create_workflow_run`` requires a
+    ``thread_id``). The simplest viable path (plan Task 2 note): create an EPHEMERAL
+    validation thread for the user, then build a minimal validation ctx mirroring the
+    resume-path ctx (``harness_engine._build_resume_context`` — the canonical
+    out-of-threads.py ctx template; G-5 forbids touching threads.py).
+
+    The ctx carries the service-role supabase (owner-scoped retrieval enforced by the
+    resolved ``folder_subtree_ids``), the run owner's effective settings + resolved
+    model (resolve-never-mutate), and the project's resolved folder scope so the
+    golden run retrieves ONLY the workflow's bound KB.
+
+    Phase 308.1-02: the composition of :func:`_create_golden_run`, :func:`_golden_ctx` and
+    :func:`_drive_created`, in that order, which are the same statements as before the cut. The
+    inline ``publish_workflow`` still calls this; the background attempt calls the pieces itself.
+    """
+    created = await _create_golden_run(
+        definition_id=definition_id,
+        definition=definition,
+        golden_input=golden_input,
+        user_id=user_id,
+        pool=pool,
+        supabase=supabase,
+    )
+    run_id = created["run_id"]
+    ctx, producer_id = await _golden_ctx(
+        run_id=run_id,
+        thread_id=created["thread_id"],
+        user_id=user_id,
+        org_id=created["org_id"],
+        owner_settings=created["owner_settings"],
+        ctx_model=created["ctx_model"],
+        golden_inputs=created["inputs"],
+        folder_subtree_ids=created["folder_subtree_ids"],
+        supabase=created["supabase"],
+        pool=pool,
+        redis=redis,
+    )
+    return await _drive_created(
+        run_id=run_id,
+        definition=definition,
+        ctx=ctx,
+        producer_id=producer_id,
+        user_id=user_id,
+        pool=pool,
+        redis=redis,
+    )
 
 
 async def _judge_golden_output(
