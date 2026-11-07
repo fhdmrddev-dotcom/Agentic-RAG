@@ -7572,7 +7572,7 @@
      "workflows"
     ],
     "summary": "Publish Workflow",
-    "description": "Publish a draft (D-07) \u2014 the QUAL-01 hard gate.\n\nEnforces, IN ORDER (the same order as ``publish_service.publish_workflow``'s stage list \u2014\nthe two docstrings must never disagree): business_requirement present -> structural lint\n-> the interactive-phase pre-run block (WR-04) -> grounding fidelity (Phase 182 stage 2.6,\nthe SAME shared collector ``POST /workflows/validate`` previews) -> a REAL golden run on\nthe project KB -> the judge verdict -> the draft->published flip. A lint-clean workflow\nwhose judge fails CANNOT publish.\n\nThe orchestration lives in ``publish_service.publish`` (owner-scoped via\n``get_definition``). HTTP mapping:\n  - ``not_found`` (not owned / does not exist) -> 404 (no existence leak, V4)\n  - ``already_published`` -> 409\n  - ``business_requirement`` (D-13) -> 400 with the structured verdict\n  - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``\n  - success -> 200 ``{published: True, version, golden_run_id}``\n\n``grounding_fidelity`` and ``draft_changed`` (like ``lint`` and ``interactive_phase``)\nare UNRECOGNISED ``blocked_stage`` values for the branches above, so they fall through\nto the 200 + structured verdict \u2014 a new stage needs NO route branch here, only this\ndocstring. The newest of them (Phase 186 / D-186-10) means the draft was edited while\nthe gauntlet was running, so the token captured at stage 0 no longer matched and the\nflip was refused. It is deliberately NOT folded into the ``already_published`` 409:\nthat would tell the author somebody else published their workflow, which is false, and\nwould hide the one fact that tells them what to do next \u2014 their own newer edit. 200 +\n``{published: False, blocked_stage, golden_run_id}`` is the honest answer, and the\ngolden run stays browsable.\n\n``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).",
+    "description": "Publish a draft (D-07) \u2014 the QUAL-01 hard gate.\n\nEnforces, IN ORDER (the same order as ``publish_service.publish_workflow``'s stage list \u2014\nthe two docstrings must never disagree): business_requirement present -> structural lint\n-> the interactive-phase pre-run block (WR-04) -> grounding fidelity (Phase 182 stage 2.6,\nthe SAME shared collector ``POST /workflows/validate`` previews) -> a REAL golden run on\nthe project KB -> the judge verdict -> the draft->published flip. A lint-clean workflow\nwhose judge fails CANNOT publish.\n\nThe orchestration lives in ``publish_service.publish`` (owner-scoped via\n``get_definition``). HTTP mapping:\n  - ``not_found`` (not owned / does not exist) -> 404 (no existence leak, V4)\n  - ``already_published`` -> 409\n  - ``business_requirement`` (D-13) -> 400 with the structured verdict\n  - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``\n  - success -> 200 ``{published: True, version, golden_run_id}``\n  - 308.1: the cheap stages passed -> 202 ``{..., golden_run_id, state: \"running\"}``; the golden run continues in the background (``publish_service.start_publish``)\n\n``grounding_fidelity`` and ``draft_changed`` (like ``lint`` and ``interactive_phase``)\nare UNRECOGNISED ``blocked_stage`` values for the branches above, so they fall through\nto the 200 + structured verdict \u2014 a new stage needs NO route branch here, only this\ndocstring. The newest of them (Phase 186 / D-186-10) means the draft was edited while\nthe gauntlet was running, so the token captured at stage 0 no longer matched and the\nflip was refused. It is deliberately NOT folded into the ``already_published`` 409:\nthat would tell the author somebody else published their workflow, which is false, and\nwould hide the one fact that tells them what to do next \u2014 their own newer edit. 200 +\n``{published: False, blocked_stage, golden_run_id}`` is the honest answer, and the\ngolden run stays browsable.\n\n``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).",
     "operationId": "publish_workflow_workflows__definition_id__publish_post",
     "security": [
      {
@@ -7604,6 +7604,16 @@
     "responses": {
      "200": {
       "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/PublishVerdict"
+        }
+       }
+      }
+     },
+     "202": {
+      "description": "the golden run started; follow it with GET /workflows/{definition_id}/publish",
       "content": {
        "application/json": {
         "schema": {
@@ -28997,6 +29007,22 @@
       },
       "type": "array",
       "title": "Auto Answered"
+     },
+     "state": {
+      "anyOf": [
+       {
+        "type": "string",
+        "enum": [
+         "running",
+         "finishing",
+         "done"
+        ]
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "State"
      }
     },
     "type": "object",

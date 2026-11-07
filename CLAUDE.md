@@ -434,8 +434,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/DraftArrivalCard.tsx` | 5 / 4 / 688 (was `4 / 3 / 625`) | 291-05: two optional props + one fold boolean; rows in a leaf · ⛔ |
 | `frontend/src/components/workflows/DecisionsList.tsx` | 5 / 3 / 429 | ⚠ now FIRES (291) · 291-05: one optional prop, one template-row sub-line |
 | `frontend/src/components/workflows/decisionsVocabulary.ts` | 6 / 4 / 344 (was `4 / 3 / 327`) | 291-05: one glyph + one formatter, still a zero-import leaf · ⛔ |
-| `backend/app/api/workflows.py` | 54 / 28 / 1722 (was `53 / 27 / 1712`) | 299-01: create_draft from_definition_id + one tweak guard · split OWED |
-| `backend/app/api/workflow_wire.py` | 4 / 4 / 532 (was `3 / 3 / 517`) | 296-06: AutoAnsweredNote + unplaced_sentences, additive |
+| `backend/app/api/workflows.py` | 55 / 30 / 1728 (was `54 / 28 / 1722`) | 308.1-02: start_publish + one 202 arm; 200 omits state · split OWED |
+| `backend/app/api/workflow_wire.py` | 5 / 5 / 539 (was `4 / 4 / 532`) | 308.1-02: PublishVerdict.state optional (absent = done), additive |
 | `backend/app/api/workflow_authoring_doors.py` | 5 / 3 / 797 (was `4 / 2 / 793`) | ⚠ now FIRES (296) · 296-06: bind returns unplaced_sentences |
 | `backend/app/api/workflow_runs.py` | 23 / 17 / 1453 (was `22 / 16 / 1449`) | 299-01: D-10 one field (org_id), no branch · extraction FIRST |
 | `backend/app/api/workflow_run_evidence.py` | 6 / 4 / 405 (was `5 / 4 / 408`) | 296-06: RunEvidenceConfidence re-exported (move only) |
@@ -454,8 +454,8 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 9 / 5 / 128 (was `8 / 4 / 121`) | 299-05: pending flag (one const + one key) · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 65 / 33 / 2874 (was `64 / 32 / 2874`) | 306-04: _RUN_ORIGIN_KINDS + mcp (mig 220 CHECK mirror) |
-| `backend/app/services/harness/publish_service.py` | 38 / 18 / 1053 (was `37 / 17 / 2066`) | 308.1-01: drive + tail moved to publish_tail.py (pure move, D-02) · ⛔ |
+| `backend/app/db/workflows.py` | 67 / 34 / 3127 (was `65 / 33 / 2874`) | 308.1-02: six publish-attempt helpers + tail CAS · ⛔ |
+| `backend/app/services/harness/publish_service.py` | 39 / 18 / 1143 (was `38 / 18 / 1053`) | 308.1-02: stages 0-2.6 in _pre_run; start_publish added · ⛔ |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |

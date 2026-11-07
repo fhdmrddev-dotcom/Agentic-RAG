@@ -97,6 +97,17 @@ fence's intent is unchanged. ``PIN286_CAPTURE=1`` was run once and each fixture 
 ``requestBody.required`` keys re-ordered around it, values unchanged); ``workflows_routes.json``
 +3 / −1 (``query_params`` of the create row: ``[]`` -> ``["from_definition_id"]``);
 ``workflows_moved_ast.json`` showed no numstat (``create_draft`` is not a moved handler).
+
+DELIBERATE RE-BASELINE (Phase 308.1-02, 2026-11-07, D-08, BUG-261107-01): ``POST
+/workflows/{definition_id}/publish`` now runs its golden run in the BACKGROUND and answers 202 with a
+handle once the cheap stages pass; every pre-run answer is unchanged (pinned byte-for-byte by
+``test_308_1_prerun_byte_identical.py``, which passes unedited). No route was added or removed, so
+``_EXPECTED_ROUTES`` is untouched. ``PIN286_CAPTURE=1`` was run once and each fixture diff was read:
+``workflows_openapi.json`` +27 / −1 (the publish operation's description gains ONE docstring line
+naming the 202 arm; its ``responses`` gain the ``202`` entry with the ``PublishVerdict`` schema; the
+``PublishVerdict`` schema gains the optional ``state`` property, ``running | finishing | done | null``);
+``workflows_moved_ast.json`` +1 / −1 (the ``body_sha256`` of ``PublishVerdict``, for the one new field
+and its comment); ``workflows_routes.json`` showed no change.
 """
 
 from __future__ import annotations

@@ -17,6 +17,7 @@ scoreboard — NOT these mocked tests.
 
 from __future__ import annotations
 
+import json
 import re
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -1680,6 +1681,10 @@ async def test_an_armed_definition_reaches_the_stage_3_golden_run():
 
 
 # ── route-level HTTP mapping (api/workflows.py — G-5: NOT threads.py) ──────────
+# Phase 308.1-02 (D-08): the route now calls ``publish_service.start_publish`` (the cheap stages in
+# the request, the golden run in the background), so these four patch THAT seam; ``publish`` stays
+# the inline composition every suite above drives. A terminal answer is a 200 ``JSONResponse`` whose
+# body carries NO ``state`` key (absent = done); a running one is a 202.
 @pytest.mark.asyncio
 async def test_route_not_found_maps_to_404():
     """A ``not_found`` block from the service maps to HTTP 404 (no existence leak)."""
@@ -1688,7 +1693,7 @@ async def test_route_not_found_maps_to_404():
     from app.api import workflows as wf_api
 
     with patch.object(
-        wf_api.publish_service, "publish",
+        wf_api.publish_service, "start_publish",
         AsyncMock(return_value={"published": False, "blocked_stage": "not_found",
                                 "named_failures": ["workflow not found"], "golden_run_id": None}),
     ), patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
@@ -1712,7 +1717,7 @@ async def test_route_missing_business_requirement_maps_to_400():
     verdict = {"published": False, "blocked_stage": "business_requirement",
                "named_failures": ["must declare a business_requirement"], "golden_run_id": None}
     with patch.object(
-        wf_api.publish_service, "publish", AsyncMock(return_value=verdict),
+        wf_api.publish_service, "start_publish", AsyncMock(return_value=verdict),
     ), patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
         with pytest.raises(HTTPException) as exc:
             await wf_api.publish_workflow(
@@ -1732,7 +1737,7 @@ async def test_route_success_returns_verdict_200():
     golden_run_id = uuid4()
     verdict = {"published": True, "version": 3, "golden_run_id": golden_run_id}
     with patch.object(
-        wf_api.publish_service, "publish", AsyncMock(return_value=verdict),
+        wf_api.publish_service, "start_publish", AsyncMock(return_value=verdict),
     ), patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
         result = await wf_api.publish_workflow(
             definition_id=_DEF_ID,
@@ -1740,9 +1745,12 @@ async def test_route_success_returns_verdict_200():
             current_user=_USER,
             redis=AsyncMock(),
         )
-    assert result.published is True
-    assert result.version == 3
-    assert result.golden_run_id == golden_run_id
+    assert result.status_code == 200
+    body = json.loads(result.body)
+    assert "state" not in body  # absent = done (D-08); the pre-308.1 body, byte for byte
+    assert body["published"] is True
+    assert body["version"] == 3
+    assert body["golden_run_id"] == str(golden_run_id)
 
 
 @pytest.mark.asyncio
@@ -1755,7 +1763,7 @@ async def test_route_judge_block_returns_200_structured_verdict():
                "named_failures": [{"summary": "delegated back to the user"}],
                "golden_run_id": golden_run_id}
     with patch.object(
-        wf_api.publish_service, "publish", AsyncMock(return_value=verdict),
+        wf_api.publish_service, "start_publish", AsyncMock(return_value=verdict),
     ), patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
         result = await wf_api.publish_workflow(
             definition_id=_DEF_ID,
@@ -1763,10 +1771,43 @@ async def test_route_judge_block_returns_200_structured_verdict():
             current_user=_USER,
             redis=AsyncMock(),
         )
-    assert result.published is False
-    assert result.blocked_stage == "judge"
-    assert result.golden_run_id == golden_run_id
-    assert result.named_failures
+    assert result.status_code == 200
+    body = json.loads(result.body)
+    assert "state" not in body
+    assert body["published"] is False
+    assert body["blocked_stage"] == "judge"
+    assert body["golden_run_id"] == str(golden_run_id)
+    assert body["named_failures"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["running", "finishing"])
+async def test_route_running_attempt_returns_202_with_the_handle(state):
+    """308.1-02 (D-08 / SC#1): the cheap stages passed and the golden run runs in the
+    background, so the route answers 202 at once with the handle and its ``state``."""
+    from app.api import workflows as wf_api
+
+    golden_run_id = uuid4()
+    handle = {"published": False, "blocked_stage": None, "named_failures": [],
+              "golden_run_id": golden_run_id, "state": state}
+    with patch.object(
+        wf_api.publish_service, "start_publish", AsyncMock(return_value=handle),
+    ), patch("app.api.workflows.get_pg_pool", AsyncMock(return_value=AsyncMock())):
+        result = await wf_api.publish_workflow(
+            definition_id=_DEF_ID,
+            body=wf_api.PublishRequest(golden_input="x"),
+            current_user=_USER,
+            redis=AsyncMock(),
+        )
+    assert result.status_code == 202
+    body = json.loads(result.body)
+    assert body["published"] is False
+    assert body["blocked_stage"] is None
+    assert body["named_failures"] == []
+    assert body["golden_run_id"] == str(golden_run_id)
+    assert body["state"] == state
+    # every other PublishVerdict field at its default
+    assert body["version"] is None and body["blocked_step"] is None and body["auto_answered"] == []
 
 
 # ══════════════════════════════════════════════════════════════════════════════

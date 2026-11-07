@@ -42,6 +42,7 @@ from uuid import UUID, uuid4
 import asyncpg
 import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, File, Header, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 from supabase import Client
@@ -1108,6 +1109,7 @@ router.post(
 @router.post(
     "/{definition_id}/publish",
     response_model=PublishVerdict,
+    responses={202: {"model": PublishVerdict, "description": "the golden run started; follow it with GET /workflows/{definition_id}/publish"}},
     dependencies=[
         Depends(require_visible("workflow_authoring")),  # Phase 148 (VIS-01) — authoring gate
         Depends(require_capability("workflows")),  # Phase 258 (TIER-01) — commercial tier gate
@@ -1118,7 +1120,7 @@ async def publish_workflow(
     body: PublishRequest,
     current_user: dict = Depends(get_current_user),
     redis: aioredis.Redis = Depends(get_redis),
-) -> PublishVerdict:
+) -> PublishVerdict | JSONResponse:
     """Publish a draft (D-07) — the QUAL-01 hard gate.
 
     Enforces, IN ORDER (the same order as ``publish_service.publish_workflow``'s stage list —
@@ -1135,6 +1137,7 @@ async def publish_workflow(
       - ``business_requirement`` (D-13) -> 400 with the structured verdict
       - any other block -> 200 ``{published: False, blocked_stage, named_failures, golden_run_id}``
       - success -> 200 ``{published: True, version, golden_run_id}``
+      - 308.1: the cheap stages passed -> 202 ``{..., golden_run_id, state: "running"}``; the golden run continues in the background (``publish_service.start_publish``)
 
     ``grounding_fidelity`` and ``draft_changed`` (like ``lint`` and ``interactive_phase``)
     are UNRECOGNISED ``blocked_stage`` values for the branches above, so they fall through
@@ -1150,7 +1153,7 @@ async def publish_workflow(
     ``definition_id`` is a path ``UUID`` -> FastAPI 422 on a malformed id (V5).
     """
     pool = await get_pg_pool()
-    result = await publish_service.publish(
+    result = await publish_service.start_publish(
         definition_id=definition_id,
         golden_input=body.golden_input,
         user=current_user,
@@ -1171,9 +1174,12 @@ async def publish_workflow(
         # requirement is a 400 (the structured verdict rides the detail).
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result)
 
+    if result.get("state") in ("running", "finishing"):
+        return JSONResponse(status_code=status.HTTP_202_ACCEPTED, content=PublishVerdict(**result).model_dump(mode="json"))
+
     # A lint / structural-gate / judge block, or a success, returns 200 with the
-    # machine-renderable verdict (the run is a real, browsable workflow_run).
-    return PublishVerdict(**result)
+    # machine-renderable verdict (the run is a real, browsable workflow_run). No ``state``: absent = done (D-08).
+    return JSONResponse(status_code=status.HTTP_200_OK, content=PublishVerdict(**result).model_dump(mode="json", exclude={"state"}))
 
 
 # ── Phase 103 (REQ-1 / WFAUTH-01) — draft CRUD routes ─────────────────────────

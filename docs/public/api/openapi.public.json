@@ -6444,6 +6444,16 @@
               }
             }
           },
+          "202": {
+            "description": "the golden run started; follow it with GET /workflows/{definition_id}/publish",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PublishVerdict"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -26317,6 +26327,22 @@
             },
             "type": "array",
             "title": "Auto Answered"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "running",
+                  "finishing",
+                  "done"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
           }
         },
         "type": "object",

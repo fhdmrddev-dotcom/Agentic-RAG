@@ -328,6 +328,13 @@ class PublishVerdict(BaseModel):
     # words come from the server. Empty for every workflow without a pause.
     # 296-06 (288-IN-01): typed; `phase` is None on a run-level note (296-03's stand-in note).
     auto_answered: list[AutoAnsweredNote] = Field(default_factory=list)
+    # ── 308.1 (D-08, BUG-261107-01) — where the publish attempt is ───────────────────────
+    # The golden run now runs in the background: the POST answers 202 with ``state: running``
+    # (``finishing`` while the tail runs), and the follow read carries it too. ⚠ ABSENT MEANS
+    # DONE: a terminal answer OMITS the key (the route excludes it), so a client that never
+    # heard of ``state`` reads exactly the body it always read, and a cached old answer still
+    # renders as a finished verdict.
+    state: Literal["running", "finishing", "done"] | None = None
 
 
 def _coerce_user_id(current_user: dict) -> UUID:
