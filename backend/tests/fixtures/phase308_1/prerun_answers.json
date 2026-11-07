@@ -1,0 +1,30 @@
+{
+  "not_found": {
+    "status": 404,
+    "body": "{\"detail\":\"workflow not found\"}"
+  },
+  "already_published": {
+    "status": 409,
+    "body": "{\"detail\":\"workflow is already published\"}"
+  },
+  "definition_invalid": {
+    "status": 200,
+    "body": "{\"published\":false,\"version\":null,\"golden_run_id\":null,\"blocked_stage\":\"definition_invalid\",\"named_failures\":[\"definition failed validation: 1 validation error for WorkflowDefinition\\nphases\\n  Input should be a valid list [type=list_type, input_value={'bad': True}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.12/v/list_type\"],\"blocked_step\":null,\"auto_answered\":[]}"
+  },
+  "business_requirement": {
+    "status": 400,
+    "body": "{\"detail\":{\"published\":false,\"blocked_stage\":\"business_requirement\",\"named_failures\":[\"Add the Business requirement — one line saying what this workflow must deliver — before publishing.\"],\"golden_run_id\":null,\"blocked_step\":null}}"
+  },
+  "lint_no_template_bound": {
+    "status": 200,
+    "body": "{\"published\":false,\"version\":null,\"golden_run_id\":null,\"blocked_stage\":\"lint\",\"named_failures\":[{\"code\":\"no_template_bound\",\"phase\":\"fill-report\",\"message\":\"“Fill the status report” fills a template, but no template is attached to this workflow. Attach a template before you publish or run it.\"}],\"blocked_step\":null,\"auto_answered\":[]}"
+  },
+  "interactive_phase": {
+    "status": 200,
+    "body": "{\"published\":false,\"version\":null,\"golden_run_id\":null,\"blocked_stage\":\"interactive_phase\",\"named_failures\":[{\"phase\":\"approve\",\"message\":\"Publishing needs a clear time limit, and the pause step \\\"Approve the draft\\\" waits outside the allowed range. Set how long it waits to between 1 second and 30 minutes to publish.\"}],\"blocked_step\":null,\"auto_answered\":[]}"
+  },
+  "grounding_fidelity": {
+    "status": 200,
+    "body": "{\"published\":false,\"version\":null,\"golden_run_id\":null,\"blocked_stage\":\"grounding_fidelity\",\"named_failures\":[{\"code\":\"unknown_tool\",\"phase\":\"answer\",\"message\":\"step 'answer' names a tool that does not exist\"}],\"blocked_step\":null,\"auto_answered\":[]}"
+  }
+}
