@@ -408,19 +408,46 @@ async def _attempt_task(run_id, *, pool, redis) -> None:
         )
     except asyncio.CancelledError:
         # ⛔ Pitfall 9: a deploy cancels us. Claim nothing and record nothing, so the next boot's
-        # golden sweep (308.1-03) can re-drive the run. Any other cancel is re-raised too (a
-        # cancelled task must stay cancelled); the drive's ``finally`` has ended the run row and
-        # the sweep finishes the tail of a terminal run whose record still reads ``running``.
+        # golden sweep (308.1-03) can re-drive the run.
         if is_app_shutting_down():
             logger.info("publish: golden run %s left for the next boot (shutdown)", run_id)
+            raise
+        # 308.1 review CR-01: any OTHER cancel is a Stop (``DELETE /runs/{id}`` cancels this very
+        # task through the engine's cancellation watch). The row is already ended (by the Stop,
+        # or by the drive's ``finally``), so the publish is finished NOW, in a task the cancel
+        # cannot reach, from the ROWS (``recovered=True``: a stopped run with no failed step gets
+        # ``golden_run_error`` in the run's own recorded words). Never a ``running`` record left
+        # on a terminal run. A cancel before the drive started ends the row first. The task
+        # itself stays cancelled.
+        logger.info("publish: golden run %s was stopped; finishing its publish", run_id)
+        _spawn(
+            _finish_after_stop(run_id, pool=pool, user_id=user_id, end_first=not drive_started),
+            name=f"publish-tail-{run_id}",
+        )
         raise
     except Exception as e:  # noqa: BLE001 — a crash is a recorded verdict, never a lost publish
         drive_error = e
         logger.exception("publish: golden run %s failed", run_id)
-        if not drive_started and user_id is not None:
+        if not drive_started:
+            # CR-02: even with no author read yet (``load_publish_attempt`` itself raised), the
+            # row is ended with words — ``end_run`` falls back to the row's own ``user_id``.
             await _end_undriven(pool, run_id, user_id=user_id, escape=e)
 
     await finish_attempt_tail(run_id, pool=pool, drive_error=drive_error, timed_out=timed_out)
+
+
+async def _finish_after_stop(run_id, *, pool, user_id, end_first: bool) -> None:
+    """CR-01: finish the publish of a golden run that was STOPPED (not a shutdown).
+
+    Spawned, never awaited by the cancelled task. ``end_first`` (the drive never started, so its
+    ``finally`` never ended the row) ends the row ``failed`` with the generic golden words first.
+    Then the recovered tail claims and records the verdict from the rows. Never raises."""
+    try:
+        if end_first:
+            await _end_undriven(pool, run_id, user_id=user_id, escape=None)
+        await finish_attempt_tail(run_id, pool=pool, recovered=True)
+    except Exception:  # noqa: BLE001 — the read-side recovery (CR-02) is the second net
+        logger.exception("publish: the stopped golden run %s could not be finished", run_id)
 
 
 async def finish_attempt_tail(
