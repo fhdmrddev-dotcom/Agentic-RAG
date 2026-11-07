@@ -299,6 +299,41 @@ async def test_a_second_post_returns_the_running_attempt_and_creates_nothing():
     write.assert_not_awaited()
 
 
+@contextlib.asynccontextmanager
+async def _busy_lock(pool, definition_id, **kw):
+    from app.db.workflows import PublishAttemptBusy
+
+    raise PublishAttemptBusy(definition_id)
+    yield  # pragma: no cover
+
+
+@pytest.mark.asyncio
+async def test_a_busy_draft_lock_answers_the_attempt_the_holder_started():
+    """308.1 review WR-04: a bounded lock wait that gives up while another POST is creating the
+    attempt answers THAT attempt's handle, never a second run and never a crash."""
+    existing = uuid4()
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value=_definition_row())),
+        patch("app.db.workflows.write_audit", AsyncMock()),
+        patch.object(publish_service, "_grounding_fidelity_failures", AsyncMock(return_value=[])),
+        patch("app.db.workflows.publish_attempt_lock", _busy_lock),
+        patch("app.db.workflows.active_publish_attempt", AsyncMock(return_value={
+            "run_id": existing, "state": "running", "created_at": datetime.now(timezone.utc)})),
+        patch.object(publish_tail, "_create_golden_run", AsyncMock()) as create_golden,
+    ):
+        result = await publish_service.start_publish(
+            definition_id=_DEF_ID, golden_input="x", user=_USER, pool=AsyncMock(), redis=AsyncMock()
+        )
+    assert result == {
+        "published": False,
+        "blocked_stage": None,
+        "named_failures": [],
+        "golden_run_id": existing,
+        "state": "running",
+    }
+    create_golden.assert_not_awaited()
+
+
 # ── the attempt task ───────────────────────────────────────────────────────────────────────────
 
 

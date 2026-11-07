@@ -483,6 +483,46 @@ async def test_the_attempt_lock_is_held_inside_and_released_after():
 
 
 @pytest.mark.asyncio
+async def test_a_waiter_gives_up_in_bounded_time_and_frees_its_connection():
+    """308.1 review WR-04: the waiter used to sit in ``pg_advisory_lock`` with no timeout, pinning
+    one of the worker's pool connections for as long as the holder took — and the holder needs
+    OTHER pool connections to finish. Enough concurrent POSTs on one draft starved the pool."""
+    import asyncpg
+
+    from app.db.workflows import PublishAttemptBusy, publish_attempt_lock
+
+    holder = await _connect()
+    try:
+        pool = await asyncpg.create_pool(_DSN, min_size=1, max_size=1)
+    except Exception:  # noqa: BLE001
+        await holder.close()
+        pytest.skip(f"local Postgres not reachable on {_DSN}")
+    definition_id = uuid.uuid4()
+    key = "SELECT pg_advisory_lock(hashtextextended($1::text, 3081))"
+    unkey = "SELECT pg_advisory_unlock(hashtextextended($1::text, 3081))"
+    try:
+        await holder.fetchval(key, str(definition_id))  # another POST holds the draft's lock
+
+        async def _wait():
+            async with publish_attempt_lock(pool, definition_id, wait_seconds=0.5):
+                raise AssertionError("entered a lock another session holds")
+
+        with pytest.raises(PublishAttemptBusy):
+            await asyncio.wait_for(_wait(), 5)  # bounded: the waiter gives up on its own
+        # Its one pool connection came back (max_size=1), with no transaction left open.
+        async with pool.acquire() as con:
+            assert await asyncio.wait_for(con.fetchval("SELECT 1"), 2) == 1
+            assert con.is_in_transaction() is False
+        await holder.fetchval(unkey, str(definition_id))
+        # ...and the lock is free to take once the holder lets go.
+        async with publish_attempt_lock(pool, definition_id, wait_seconds=0.5):
+            pass
+    finally:
+        await pool.close()
+        await holder.close()
+
+
+@pytest.mark.asyncio
 async def test_the_attempt_lock_is_released_when_the_body_raises():
     import asyncpg
 
