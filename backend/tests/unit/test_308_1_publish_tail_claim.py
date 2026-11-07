@@ -269,6 +269,68 @@ async def test_the_verdict_is_written_once_and_only_from_finishing():
         await conn.close()
 
 
+# ── 308.1 review WR-02: the tail claim has an OWNER; only it may record the verdict ────────────
+
+
+@pytest.mark.asyncio
+async def test_each_claim_carries_a_fresh_owner_token_and_only_that_owner_records():
+    """WR-02: a stale ``finishing`` claim was re-claimable while its tail might still be running
+    (``finishing_at`` was never refreshed), and ``finish_publish_attempt`` matched ANY
+    ``finishing`` record, so two tails could both record and the last write won. Each claim now
+    stamps a fresh token, and the verdict write requires it."""
+    from app.db.workflows import claim_publish_tail, finish_publish_attempt
+
+    conn = await _temp_runs_conn()
+    try:
+        run_id = await _insert(conn, metadata={"publish": _record("running")})
+        first = await claim_publish_tail(conn, run_id, LEASE)
+        token_a = first["finishing_token"]
+        assert isinstance(token_a, str) and token_a
+        # The first owner's claim goes stale; a second owner re-claims with a NEW token.
+        await conn.execute(
+            "UPDATE workflow_runs SET metadata = jsonb_set(metadata, '{publish,finishing_at}',"
+            " to_jsonb(now() - make_interval(secs => $2::float8))) WHERE id = $1",
+            run_id,
+            float(LEASE + 5),
+        )
+        second = await claim_publish_tail(conn, run_id, LEASE)
+        token_b = second["finishing_token"]
+        assert token_b and token_b != token_a
+        verdict = {"published": False, "blocked_stage": "judge", "golden_run_id": str(run_id)}
+        assert await finish_publish_attempt(conn, run_id, {"published": True}, token=token_a) is False
+        assert (await _publish_of(conn, run_id))["state"] == "finishing"
+        assert await finish_publish_attempt(conn, run_id, verdict, token=token_b) is True
+        rec = await _publish_of(conn, run_id)
+        assert rec["state"] == "done" and rec["verdict"] == verdict
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_a_live_tail_keeps_its_claim_fresh_and_a_stale_owner_cannot():
+    """WR-02: the owner's beat refreshes ``finishing_at``, so a slow judge is never re-claimed by
+    another worker's late pass; a beat with a lost token changes nothing."""
+    from app.db.workflows import claim_publish_tail, touch_publish_tail
+
+    conn = await _temp_runs_conn()
+    try:
+        run_id = await _insert(conn, metadata={"publish": _record("running")})
+        token = (await claim_publish_tail(conn, run_id, LEASE))["finishing_token"]
+        await conn.execute(
+            "UPDATE workflow_runs SET metadata = jsonb_set(metadata, '{publish,finishing_at}',"
+            " to_jsonb(now() - make_interval(secs => $2::float8))) WHERE id = $1",
+            run_id,
+            float(LEASE + 5),
+        )
+        assert await touch_publish_tail(conn, run_id, "not-the-owner") is False
+        assert await touch_publish_tail(conn, run_id, token) is True
+        # Refreshed, so it is no longer stale: nobody else can claim the live tail.
+        assert await claim_publish_tail(conn, run_id, LEASE) is None
+        assert (await _publish_of(conn, run_id))["finishing_token"] == token
+    finally:
+        await conn.close()
+
+
 # ── load_publish_attempt ────────────────────────────────────────────────────────────────────────
 
 

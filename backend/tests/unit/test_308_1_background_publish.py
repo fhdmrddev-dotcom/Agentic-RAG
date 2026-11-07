@@ -599,6 +599,48 @@ async def test_a_verdict_write_that_keeps_failing_never_raises():
 
 
 @pytest.mark.asyncio
+async def test_the_verdict_is_recorded_with_the_claims_owner_token():
+    """308.1 review WR-02: only the claim's owner may record the verdict."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with _Env(run_id) as env, patch("app.db.workflows.touch_publish_tail", AsyncMock(return_value=True)):
+        env.claim.return_value = dict(env.claim_result, finishing_token="tok-claim-1")
+        await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock())
+    assert env.finish_attempt.await_args.kwargs["token"] == "tok-claim-1"
+
+
+@pytest.mark.asyncio
+async def test_a_slow_tail_keeps_its_claim_fresh_with_its_token():
+    """WR-02: ``finishing_at`` was never refreshed, so a judge slower than the lease could be
+    re-claimed by another worker while it still ran: two judges, two flips. The owner beats."""
+    from app.config import settings
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with (
+        _Env(run_id) as env,
+        patch.object(settings, "harness_resume_lease_seconds", 0.3),
+        patch("app.db.workflows.touch_publish_tail", AsyncMock(return_value=True)) as touch,
+    ):
+        env.claim.return_value = dict(env.claim_result, finishing_token="tok-claim-2")
+        tail_return = env.tail.return_value
+
+        async def _slow_tail(**kw):
+            await asyncio.sleep(0.45)
+            return tail_return
+
+        env.tail.side_effect = _slow_tail
+        await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock())
+        beats = touch.await_count
+        await asyncio.sleep(0.25)
+        assert touch.await_count == beats  # the beat stops with the tail
+    assert beats >= 2
+    assert all(c.args[1:] == (run_id, "tok-claim-2") for c in touch.await_args_list)
+    env.verdict_written()
+
+
+@pytest.mark.asyncio
 async def test_a_record_read_that_raises_still_ends_the_run_with_words():
     """CR-02 (b): ``load_publish_attempt`` raising left ``user_id`` unset, and the pre-drive arm
     only ended the row when it knew the author, so the run stayed ``active`` until a restart."""

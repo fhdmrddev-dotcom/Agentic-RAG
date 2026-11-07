@@ -481,6 +481,84 @@ async def test_a_recovered_failed_run_with_a_failed_step_takes_the_structural_ga
 
 
 @pytest.mark.asyncio
+async def test_a_recovered_tail_whose_run_already_has_a_block_receipt_records_that_verdict():
+    """308.1 review WR-02: the dead tail had already decided (its ``publish_blocked`` receipt is
+    written) and died before recording ``done``. Re-running from the top repeated the judge, its
+    spend and its receipts. The recorded decision IS the verdict; nothing runs again."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    blocked = {
+        "definition_id": str(_DEF_ID),
+        "blocked_stage": "judge",
+        "named_failures": [{"criterion": "grounded", "score": 1, "evidence": "uncited"}],
+        "golden_run_id": str(run_id),
+        "blocked_step": None,
+    }
+    with _recovered(run_id, receipts={"publish_blocked": blocked}) as env:
+        await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock(), recovered=True)
+    assert env.verdict_written() == {
+        "published": False,
+        "blocked_stage": "judge",
+        "named_failures": blocked["named_failures"],
+        "golden_run_id": str(run_id),
+        "blocked_step": None,
+    }
+    env.tail.assert_not_awaited()
+    env.judge.assert_not_awaited()
+    env.flip.assert_not_awaited()
+    env.write_audit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_a_recovered_tail_after_the_judge_reuses_its_recorded_verdict_and_spend():
+    """WR-02 / D-17: the judge already ran (its ``judge_verdict`` receipt exists) and the worker
+    died before the flip. The recovered tail must not call the judge again, persist its tokens a
+    second time, or repeat ``publish_attempted`` / ``judge_verdict``; it goes straight to the flip."""
+    from app.services.harness import publish_attempt, publish_tail
+
+    run_id = uuid4()
+    judged = {"definition_id": str(_DEF_ID), "overall_passed": True, "overall_score": 92,
+              "summary": "good", "failure": None}
+    with (
+        _recovered(run_id, receipts={"judge_verdict": judged}) as env,
+        patch("app.db.workflows.persist_run_usage", AsyncMock()) as persist,
+    ):
+        env.flip.return_value = 5
+        env.stack.enter_context(
+            patch.object(publish_service, "run_tail_stages", publish_tail.run_tail_stages)
+        )
+        await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock(), recovered=True)
+    env.judge.assert_not_awaited()
+    persist.assert_not_awaited()
+    env.flip.assert_awaited_once()
+    assert env.flip.await_args.kwargs["token"] == "tok-REC"
+    kinds = [c.kwargs["event_type"] for c in env.write_audit.await_args_list]
+    assert kinds == ["publish_succeeded"]
+    assert env.verdict_written()["published"] is True
+    assert env.verdict_written()["version"] == 5
+
+
+@pytest.mark.asyncio
+async def test_a_recovered_tail_whose_judge_failed_blocks_on_the_recorded_verdict():
+    from app.services.harness import publish_attempt, publish_tail
+
+    run_id = uuid4()
+    judged = {"definition_id": str(_DEF_ID), "overall_passed": False, "overall_score": 20,
+              "summary": "a quarter of the claims are uncited", "failure": None}
+    with _recovered(run_id, receipts={"judge_verdict": judged}) as env:
+        env.stack.enter_context(
+            patch.object(publish_service, "run_tail_stages", publish_tail.run_tail_stages)
+        )
+        await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock(), recovered=True)
+    env.judge.assert_not_awaited()
+    env.flip.assert_not_awaited()
+    verdict = env.verdict_written()
+    assert verdict["blocked_stage"] == "judge"
+    assert verdict["named_failures"] == [{"summary": "a quarter of the claims are uncited"}]
+
+
+@pytest.mark.asyncio
 async def test_a_recovered_tail_whose_claim_is_lost_runs_nothing():
     from app.services.harness import publish_attempt
 
