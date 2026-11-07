@@ -25,11 +25,11 @@
  *  - named_failures render by KEY-DETECTION; any bare string / unrecognized shape
  *    renders as a BLOCK, never a pass; lint codes render the LOWERCASE literals.
  */
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 // Phase 186-16 adds `fireEvent`: the WR-10 rows below click a control that is expected to
 // be REFUSED, and `userEvent` asserts pointer-events on the target before it will act — so
 // a disabled button makes it throw rather than letting the suite measure "no request left".
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react"
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 // Phase 186-10 (WR-02): the F18 describe at the foot of this file reads the SERVER's own
 // source instead of trusting a transcribed list — via the SAME `?raw` loader the component
@@ -44,6 +44,12 @@ import userEvent from "@testing-library/user-event"
 // reference, so `fileURLToPath` receives something that is no longer a `file:` URL and
 // throws before a single test runs (observed, not predicted).
 import publishServiceSource from "../../../../backend/app/services/harness/publish_service.py?raw"
+// 308.1-04 (Rule 3, an inherited red): 308.1-01 MOVED the golden drive and the post-run tail
+// into `publish_tail.py`, and 308.1-02 the attempt into `publish_attempt.py`, taking their
+// `stage="..."` literals with them — F18a read 8 stages where the service still emits 11.
+// The emitted set is now the union of the three modules that write a verdict.
+import publishTailSource from "../../../../backend/app/services/harness/publish_tail.py?raw"
+import publishAttemptSource from "../../../../backend/app/services/harness/publish_attempt.py?raw"
 // Read the component SOURCE via Vite's ?raw loader (typechecks under `vite/client`).
 import publishGauntletSource from "./PublishGauntlet?raw"
 // 193.2-06 (F-5, the client half): the SECOND consumer of the server's one message —
@@ -68,8 +74,9 @@ import {
 // Phase 281-03 (D-28): the two next-step lines, IMPORTED — the card picks one by whether the
 // run link exists, and a re-typed sentence would go green against a re-worded constant.
 import { BLOCKED_STEP_NEXT, BLOCKED_STEP_NEXT_NO_RUN } from "./publishBlockedStep"
-import type { PublishOutcome } from "@/lib/api"
-import { publishWorkflow } from "@/lib/api"
+import type { PublishAttempt, PublishOutcome, PublishVerdict } from "@/lib/api"
+import { ApiError, getPublishAttempt, publishWorkflow } from "@/lib/api"
+import { PUBLISH_FOLLOW_COPY, publishHonestyText } from "./publishFollowVocabulary"
 
 /**
  * D-ITEM-187-20-01 — this suite's per-test budget, raised from the 5 s default.
@@ -92,13 +99,22 @@ vi.setConfig({ testTimeout: 20000 })
 
 vi.mock("@/lib/api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/api")>()
-  return { ...actual, publishWorkflow: vi.fn() }
+  // 308.1-04: opening the modal now asks the server where this draft's publish is. The
+  // default answer is "nothing running", so every pre-308.1 case renders the resting form.
+  return {
+    ...actual,
+    publishWorkflow: vi.fn(),
+    getPublishAttempt: vi.fn().mockResolvedValue({ state: "none", golden_run_id: null, verdict: null, progress: null }),
+  }
 })
 
 const mockedPublish = vi.mocked(publishWorkflow)
+const mockedRead = vi.mocked(getPublishAttempt)
 
 beforeEach(() => {
   mockedPublish.mockReset()
+  mockedRead.mockReset()
+  mockedRead.mockResolvedValue({ state: "none", golden_run_id: null, verdict: null, progress: null })
 })
 
 /** Open the publish modal (click the compact "Publish…" trigger). */
@@ -107,6 +123,8 @@ async function openModal() {
   await user.click(screen.getByTestId("publish-trigger"))
   // The modal + its golden_input textarea are now mounted.
   await waitFor(() => expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument())
+  // 308.1-04: and the mount read has answered, so the inner Publish is no longer `Checking…`.
+  await waitFor(() => expect(screen.queryByText(PUBLISH_FOLLOW_COPY.checking)).not.toBeInTheDocument())
 }
 
 /** Open the modal, type the golden_input, and hit the "run the checks" Publish. */
@@ -689,7 +707,11 @@ function extractStages(source: string): string[] {
 }
 
 /** Every distinct `blocked_stage` value the publish service can emit, read from its source. */
-const EMITTED_STAGES = new Set(extractStages(publishServiceSource))
+const EMITTED_STAGES = new Set([
+  ...extractStages(publishServiceSource),
+  ...extractStages(publishTailSource),
+  ...extractStages(publishAttemptSource),
+])
 
 /**
  * The stages that are emitted but provably cannot arrive here as a `blocked_stage`.
@@ -703,6 +725,9 @@ const EMITTED_STAGES = new Set(extractStages(publishServiceSource))
  * to `{kind:"not_found"}` and HTTP 409 to `{kind:"already_published"}`. NEITHER outcome
  * carries a `verdict`, and the spine is driven by `verdict?.blocked_stage ?? null`, so this
  * stage renders as its own dedicated 409 block panel and never reaches the spine at all.
+ * 308.1-04: a FOLLOWED attempt can now carry it as a `done` verdict (the tail's flip lost);
+ * `usePublishAttempt` maps that to the same `{kind:"already_published"}`, so it still never
+ * reaches the spine.
  */
 const NOT_ON_THE_SPINE = new Set(["already_published"])
 
@@ -2096,5 +2121,350 @@ describe("288-02 — the pause the practice run answered for the author", () => 
     await doPublish()
     await waitFor(() => expect(screen.getByTestId("publish-success")).toBeInTheDocument())
     expect(screen.queryByTestId("auto-answered")).not.toBeInTheDocument()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Phase 308.1-04 (BUG-261107-01; D-03, D-19..D-24; UI-SPEC P1-P13) — the publish screen
+// follows a golden run the SERVER is running. The POST answers 202 with a handle; the
+// screen reads `GET /workflows/{id}/publish` until a verdict, and picks it up again on a
+// reopen. Driven with fake timers and `fireEvent` (no `waitFor`, which does not advance
+// vitest's fake clock); every assertion is on rendered CONTENT, not testid presence alone.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("308.1-04 — the publish screen follows a run the server is running", () => {
+  const NOW = Date.parse("2026-11-07T12:00:00Z")
+  const NONE: PublishAttempt = { state: "none", golden_run_id: null, verdict: null, progress: null }
+  const DEF = {
+    phases: [
+      { slug: "gather", phase_index: 0, name: "Gather sources", config: { phase_type: "llm_agent" } },
+      { slug: "zz-slug-308-token", phase_index: 1, name: "Collect evidence", config: { phase_type: "llm_agent" } },
+      { slug: "draft", phase_index: 2, name: "Draft the brief", config: { phase_type: "llm_agent" } },
+      { slug: "check", phase_index: 3, name: "Check figures", config: { phase_type: "llm_agent" } },
+      { slug: "send", phase_index: 4, name: "Write it up", config: { phase_type: "llm_emit" } },
+    ],
+  }
+  const HANDLE: PublishOutcome = {
+    kind: "running",
+    verdict: { published: false, version: null, golden_run_id: "run-1", blocked_stage: null, named_failures: [], state: "running" },
+  }
+  const JUDGE: PublishVerdict = {
+    published: false,
+    version: null,
+    golden_run_id: "run-1",
+    blocked_stage: "judge",
+    named_failures: [
+      { criterion: "grounded_in_evidence", score: 0.42, evidence: "3 of 12 figures are uncited." },
+      { summary: "a quarter of its quantitative claims are not grounded in a cited source" },
+    ],
+  }
+  const PASS: PublishVerdict = {
+    published: true,
+    version: 4,
+    golden_run_id: "run-1",
+    blocked_stage: null,
+    named_failures: [],
+  }
+
+  function running(over: Partial<PublishAttempt> = {}): PublishAttempt {
+    return {
+      state: "running",
+      golden_run_id: "run-1",
+      verdict: null,
+      progress: { step_index: 2, step_count: 5, step_name: "Collect evidence", started_at: new Date(NOW - 75_000).toISOString() },
+      ...over,
+    }
+  }
+  function done(v: PublishVerdict): PublishAttempt {
+    return {
+      state: "done",
+      golden_run_id: v.golden_run_id,
+      verdict: { ...v, state: null },
+      progress: { step_index: null, step_count: 5, step_name: null, started_at: new Date(NOW - 200_000).toISOString() },
+    }
+  }
+
+  async function flush(ms = 0) {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms)
+    })
+  }
+  async function open() {
+    fireEvent.click(screen.getByTestId("publish-trigger"))
+    await flush()
+  }
+  async function submit(text = "a representative kickoff") {
+    fireEvent.change(screen.getByLabelText(/golden_input/i), { target: { value: text } })
+    fireEvent.click(screen.getByRole("button", { name: /run the checks/i }))
+    await flush()
+  }
+  /** The hero container (the element carrying the glow), or null. */
+  function hero(): HTMLElement | null {
+    return (screen.queryByTestId("publish-elapsed")?.closest(".gauntlet-hero-glow") as HTMLElement | null) ?? null
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("P1 opening — the inner Publish is disabled and reads Checking…; no hero", async () => {
+    mockedRead.mockReturnValue(new Promise<PublishAttempt>(() => {}))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    const btn = screen.getByRole("button", { name: PUBLISH_FOLLOW_COPY.checking })
+    expect(btn).toBeDisabled()
+    expect(hero()).toBeNull()
+    expect(mockedRead).toHaveBeenCalledWith("def-1")
+  })
+
+  it("P2 submitting — Publishing…, the C-02 hero, the ✕ disabled with today's title", async () => {
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>(() => {}))
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    await submit()
+    expect(screen.getByRole("button", { name: "Publishing…" })).toBeDisabled()
+    expect(hero()?.textContent).toContain(PUBLISH_FOLLOW_COPY.headingRunning)
+    const close = screen.getByTestId("publish-modal-close")
+    expect(close).toBeDisabled()
+    expect(close).toHaveAttribute("title", "Can't close while the gauntlet is running")
+  })
+
+  it("P3 running after a 202 — no form; progress in the author's words; server clock; live link; ✕ open", async () => {
+    mockedRead.mockResolvedValueOnce(NONE).mockResolvedValue(running())
+    mockedPublish.mockResolvedValue(HANDLE)
+    const onOpenRun = vi.fn()
+    render(<PublishGauntlet definitionId="def-1" definition={DEF} onOpenRun={onOpenRun} />)
+    await open()
+    await submit()
+    expect(screen.queryByLabelText(/golden_input/i)).not.toBeInTheDocument()
+    expect(hero()?.textContent).toContain(PUBLISH_FOLLOW_COPY.headingRunning)
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(/^Step 2 of 5: Collect evidence$/)
+    expect(screen.getByTestId("publish-elapsed")).toHaveTextContent("1m 15s elapsed")
+    // The slug never reaches the screen (sketch 215 #1).
+    expect(screen.getByTestId("publish-modal").textContent).not.toContain("zz-slug-308-token")
+    const live = screen.getByTestId("run-link-live")
+    expect(live).toHaveTextContent(PUBLISH_FOLLOW_COPY.watchLive)
+    fireEvent.click(live)
+    expect(onOpenRun).toHaveBeenCalledWith("run-1")
+    const close = screen.getByTestId("publish-modal-close")
+    expect(close).toBeEnabled()
+    expect(close).toHaveAttribute("title", PUBLISH_FOLLOW_COPY.closeWhileFollowing)
+    expect(screen.getByTestId("gauntlet-spine").querySelectorAll(".gauntlet-node-run")).toHaveLength(1)
+    // C-06 replaces the old honesty sentence, whole.
+    expect(hero()?.textContent).toContain(publishHonestyText())
+    // The role-SET scan holds over the running surface, the new live link included.
+    expect(forwardControlsIn(screen.getByTestId("publish-modal"))).toEqual([])
+  })
+
+  it("P3 — with no definition the server's step name is used; no step yet reads Starting the run…", async () => {
+    mockedRead.mockResolvedValueOnce(running())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(/^Step 2 of 5: Collect evidence$/)
+    mockedRead.mockResolvedValue(
+      running({ progress: { step_index: null, step_count: 5, step_name: null, started_at: new Date(NOW - 5_000).toISOString() } }),
+    )
+    await flush(3_000)
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(PUBLISH_FOLLOW_COPY.starting)
+  })
+
+  it("P4 finishing — the C-03 heading, the C-05 line, no finished run link yet", async () => {
+    mockedRead.mockResolvedValue(running({ state: "finishing" }))
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await open()
+    expect(hero()?.textContent).toContain(PUBLISH_FOLLOW_COPY.headingFinishing)
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent(PUBLISH_FOLLOW_COPY.finishing)
+    expect(screen.queryByTestId("run-link")).not.toBeInTheDocument()
+  })
+
+  it("P5 pass by live follow — the success view, the finished link, onPublished exactly once", async () => {
+    mockedRead.mockResolvedValueOnce(NONE).mockResolvedValueOnce(running()).mockResolvedValue(done(PASS))
+    mockedPublish.mockResolvedValue(HANDLE)
+    const onPublished = vi.fn()
+    const { rerender } = render(<PublishGauntlet definitionId="def-1" onPublished={onPublished} onOpenRun={vi.fn()} />)
+    await open()
+    await submit()
+    expect(screen.getByTestId("publish-progress")).toBeInTheDocument()
+    await flush(3_000)
+    expect(screen.getByTestId("publish-success")).toBeInTheDocument()
+    expect(screen.getByTestId("verdict-headline")).toHaveTextContent("Published — v4 is live")
+    expect(screen.getByTestId("run-link")).toHaveTextContent("▦ Open the golden run that was judged ›")
+    expect(screen.queryByTestId("run-link-live")).not.toBeInTheDocument()
+    rerender(<PublishGauntlet definitionId="def-1" onPublished={onPublished} onOpenRun={vi.fn()} />)
+    await flush(3_000)
+    rerender(<PublishGauntlet definitionId="def-1" onPublished={onPublished} onOpenRun={vi.fn()} />)
+    await flush(3_000)
+    expect(onPublished).toHaveBeenCalledTimes(1)
+    expect(onPublished).toHaveBeenCalledWith(4, [])
+  })
+
+  it("P6 judge block by live follow renders the same text as the POST's judge verdict", async () => {
+    // Today's render: the judge verdict straight from a 200 POST.
+    mockedPublish.mockResolvedValueOnce({ kind: "verdict", verdict: JUDGE })
+    const first = render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await open()
+    await submit()
+    const today = screen.getByTestId("publish-block").textContent
+    first.unmount()
+
+    // The followed render: 202, then a poll answering done with the same verdict.
+    mockedRead.mockResolvedValueOnce(NONE).mockResolvedValueOnce(running()).mockResolvedValue(done(JUDGE))
+    mockedPublish.mockResolvedValueOnce(HANDLE)
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await open()
+    await submit()
+    await flush(3_000)
+    const block = screen.getByTestId("publish-block")
+    expect(block.textContent).toBe(today)
+    expect(within(block).getByText("publish anyway", { selector: "s" }).tagName).toBe("S")
+    expect(within(block).getByTestId("run-link")).toBeInTheDocument()
+  })
+
+  it("P7 two failed polls show C-07, muted, never a verdict; a good poll clears it", async () => {
+    mockedRead.mockResolvedValueOnce(running())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    mockedRead.mockRejectedValue(new Error("Failed to fetch"))
+    await flush(3_000)
+    expect(screen.queryByText(PUBLISH_FOLLOW_COPY.followError)).not.toBeInTheDocument()
+    await flush(3_000)
+    const line = screen.getByText(PUBLISH_FOLLOW_COPY.followError)
+    expect(line.className).toContain("text-muted-foreground")
+    expect(screen.queryByTestId("publish-block")).not.toBeInTheDocument()
+    expect(screen.queryByTestId("http-outcome")).not.toBeInTheDocument()
+    expect((screen.getByTestId("publish-modal").textContent ?? "").toLowerCase()).not.toContain("failed")
+    expect(hero()).not.toBeNull()
+    expect(screen.getByTestId("publish-elapsed")).toBeInTheDocument()
+    mockedRead.mockResolvedValue(running())
+    await flush(3_000)
+    expect(screen.queryByText(PUBLISH_FOLLOW_COPY.followError)).not.toBeInTheDocument()
+    expect(hero()).not.toBeNull()
+  })
+
+  it("P8 a 404 while following — C-09, the hero gone, the resting form back", async () => {
+    mockedRead.mockResolvedValueOnce(running())
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    mockedRead.mockRejectedValue(new ApiError("Failed to read the publish (status 404)", 404))
+    await flush(3_000)
+    expect(screen.getByText(PUBLISH_FOLLOW_COPY.lost)).toBeInTheDocument()
+    expect(hero()).toBeNull()
+    expect(screen.getByLabelText(/golden_input/i)).toBeInTheDocument()
+  })
+
+  it("P9 reopen onto a running attempt follows it and never sends a POST", async () => {
+    mockedRead.mockResolvedValue(running())
+    render(<PublishGauntlet definitionId="def-1" definition={DEF} onOpenRun={vi.fn()} />)
+    await open()
+    expect(screen.getByTestId("publish-progress")).toHaveTextContent("Step 2 of 5: Collect evidence")
+    expect(screen.getByTestId("publish-elapsed")).toHaveTextContent("1m 15s elapsed")
+    expect(screen.getByTestId("run-link-live")).toBeInTheDocument()
+    expect(screen.queryByLabelText(/golden_input/i)).not.toBeInTheDocument()
+    await flush(9_000)
+    expect(mockedPublish).not.toHaveBeenCalled()
+  })
+
+  it("P10 reopen onto a finished attempt renders its verdict without a POST", async () => {
+    mockedRead.mockResolvedValue(done(JUDGE))
+    render(<PublishGauntlet definitionId="def-1" onOpenRun={vi.fn()} />)
+    await open()
+    const block = screen.getByTestId("publish-block")
+    expect(within(block).getByText("publish anyway", { selector: "s" }).tagName).toBe("S")
+    expect(screen.getByTestId("verdict-blocked_stage")).toHaveTextContent(/judge/)
+    expect(mockedPublish).not.toHaveBeenCalled()
+  })
+
+  it("P11 a 200 POST body with no state renders the verdict view", async () => {
+    const lint: PublishVerdict = { published: false, version: null, golden_run_id: null, blocked_stage: "lint", named_failures: [] }
+    expect("state" in lint).toBe(false)
+    mockedPublish.mockResolvedValue({ kind: "verdict", verdict: lint })
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    await submit()
+    expect(screen.getByTestId("publish-block")).toBeInTheDocument()
+    expect(screen.getByTestId("http-outcome")).toHaveTextContent("200 · verdict")
+    expect(hero()).toBeNull()
+  })
+
+  it("P12 the WF-P1 and WF-P2 pre-run refusals render byte-identically to the pre-308.1 surface", async () => {
+    const WF_P1: PublishOutcome = {
+      kind: "business_requirement",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: null,
+        blocked_stage: "business_requirement",
+        named_failures: ["the workflow has no business_requirement"],
+      },
+    }
+    const WF_P2: PublishOutcome = {
+      kind: "verdict",
+      verdict: {
+        published: false,
+        version: null,
+        golden_run_id: null,
+        blocked_stage: "lint",
+        named_failures: [
+          { code: "no_template_bound", phase: "write-it-up", message: "This step fills a template, but no template is attached to the workflow." },
+        ],
+      },
+    }
+    mockedPublish.mockResolvedValueOnce(WF_P1)
+    const a = render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    await submit()
+    const p1 = screen.getByTestId("publish-block").textContent
+    a.unmount()
+    mockedPublish.mockResolvedValueOnce(WF_P2)
+    render(<PublishGauntlet definitionId="def-1" />)
+    await open()
+    await submit()
+    const p2 = screen.getByTestId("publish-block").textContent
+    // Both literals were CAPTURED from the base component (893ce7d66, before this plan's
+    // gauntlet edit) by running these same steps against it, then pasted verbatim.
+    expect(p1).toBe(
+      "⛔Publish was blocked — nothing was published. What stopped it is named below.Publishing honestly refused. Fix the cause named below and try again.Show raw verdict — the 5 server fields, verbatimpublishedfalseversionnullgolden_run_idnullblocked_stagebusiness_requirementnamed_failureslist · 1 item(s) (rendered above)▦rendered verbatim from the server — not re-derived in the client.named_failures — what blocked publishthe workflow has no business_requirement↳ golden_run_id is null — this blocked before stage 3, so there is no run to open. (A pre-run block never has a run link.)The only path forward is to fix the cause and publish again — each attempt is a brand-new trial run and a fresh independent review.no override · publish anyway↻ Fix & re-publish",
+    )
+    expect(p2).toBe(
+      "⛔Blocked before the trial run — the workflow is missing something it needs, named below. Nothing was run.Publishing honestly refused. Fix the cause named below and try again.Show raw verdict — the 5 server fields, verbatimpublishedfalseversionnullgolden_run_idnullblocked_stagelintnamed_failureslist · 1 item(s) (rendered above)▦rendered verbatim from the server — not re-derived in the client.named_failures — what blocked publishno_template_boundwrite-it-upThis step fills a template, but no template is attached to the workflow.↳ golden_run_id is null — this blocked before stage 3, so there is no run to open. (A pre-run block never has a run link.)The only path forward is to fix the cause and publish again — each attempt is a brand-new trial run and a fresh independent review.no override · publish anyway↻ Fix & re-publish",
+    )
+  })
+
+  it("P13 onRunningChange — true while submitting/following and open; false after a close mid-run and on unmount", async () => {
+    mockedRead.mockResolvedValueOnce(NONE).mockResolvedValue(running())
+    let releasePost: (o: PublishOutcome) => void = () => {}
+    mockedPublish.mockReturnValue(new Promise<PublishOutcome>((r) => (releasePost = r)))
+    const onRunningChange = vi.fn()
+    const { unmount } = render(<PublishGauntlet definitionId="def-1" onRunningChange={onRunningChange} />)
+    await open()
+    expect(onRunningChange).toHaveBeenLastCalledWith(false)
+    await submit()
+    expect(onRunningChange).toHaveBeenLastCalledWith(true)
+    await act(async () => {
+      releasePost(HANDLE)
+      await vi.advanceTimersByTimeAsync(0)
+    })
+    expect(screen.getByTestId("publish-progress")).toBeInTheDocument()
+    expect(onRunningChange).toHaveBeenLastCalledWith(true)
+    fireEvent.click(screen.getByTestId("publish-modal-close"))
+    await flush()
+    expect(screen.queryByTestId("publish-modal")).not.toBeInTheDocument()
+    expect(onRunningChange).toHaveBeenLastCalledWith(false)
+    // Closed: no follow read is sent any more.
+    const reads = mockedRead.mock.calls.length
+    await flush(9_000)
+    expect(mockedRead.mock.calls.length).toBe(reads)
+    onRunningChange.mockClear()
+    unmount()
+    expect(onRunningChange).toHaveBeenLastCalledWith(false)
+  })
+
+  it("the source: the follow logic left the component, and the old honesty sentence is gone", () => {
+    expect(publishGauntletSource).toMatch(/usePublishAttempt\(/)
+    expect(publishGauntletSource).not.toMatch(/useState<PublishOutcome|setElapsedSec|window\.setInterval/)
+    expect(publishGauntletSource.toLowerCase()).not.toContain("don't close")
   })
 })
