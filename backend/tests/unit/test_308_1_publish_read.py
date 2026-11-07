@@ -191,6 +191,63 @@ def test_an_owner_with_no_attempt_gets_state_none(client):
     assert resp.json() == {"state": "none", "golden_run_id": None, "verdict": None, "progress": None}
 
 
+# ── 308.1 review CR-02 (c): a stranded tail is recovered on READ, not only at a worker boot ─────
+
+
+def _get_recovering(client, attempt):
+    from unittest.mock import MagicMock
+
+    p1, p2, p3 = _patched(_definition(), attempt, _phases(None))
+    with (
+        p1, p2 as latest, p3,
+        patch("app.services.harness.publish_attempt.recover_publish_tail", MagicMock()) as recover,
+    ):
+        resp = client.get(f"/workflows/{_DEF_ID}/publish")
+    return resp, recover, latest
+
+
+@pytest.mark.parametrize("state", ["running", "finishing"])
+def test_a_stranded_tail_is_recovered_by_the_read_and_the_current_state_answered(client, state):
+    """CR-02: all recovery used to run only at process boot, so a record left ``running`` on an
+    ended run (a Stop, a DB blip before the claim) or a dead ``finishing`` claim spun the publish
+    screen until the next restart. The read now spawns the recovered tail (the CAS keeps it
+    exactly-once) and answers what it found; the next poll reads the verdict."""
+    from app.config import settings
+
+    attempt = dict(_attempt(state), status="cancelled", tail_stranded=True)
+    resp, recover, latest = _get_recovering(client, attempt)
+    assert resp.status_code == 200
+    assert resp.json()["state"] == state
+    recover.assert_called_once()
+    assert recover.call_args.args == (_RUN_ID,)
+    assert "pool" in recover.call_args.kwargs
+    assert latest.await_args.kwargs["lease_seconds"] == settings.harness_resume_lease_seconds
+
+
+@pytest.mark.parametrize("state", ["running", "finishing", "done"])
+def test_a_live_attempt_is_never_recovered_by_the_read(client, state):
+    verdict = {"published": True, "version": 2, "golden_run_id": str(_RUN_ID)} if state == "done" else None
+    attempt = dict(_attempt(state, verdict), tail_stranded=False)
+    resp, recover, _ = _get_recovering(client, attempt)
+    assert resp.status_code == 200
+    recover.assert_not_called()
+
+
+def test_a_recovery_that_cannot_start_never_breaks_the_read(client):
+    from unittest.mock import MagicMock
+
+    attempt = dict(_attempt("running"), status="completed", tail_stranded=True)
+    p1, p2, p3 = _patched(_definition(), attempt, _phases(None))
+    with (
+        p1, p2, p3,
+        patch("app.services.harness.publish_attempt.recover_publish_tail",
+              MagicMock(side_effect=RuntimeError("no loop"))),
+    ):
+        resp = client.get(f"/workflows/{_DEF_ID}/publish")
+    assert resp.status_code == 200
+    assert resp.json()["state"] == "running"
+
+
 # ── the POST's uniform 404 ──────────────────────────────────────────────────────────────────────
 
 

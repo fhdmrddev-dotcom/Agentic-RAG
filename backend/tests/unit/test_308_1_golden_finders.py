@@ -288,6 +288,107 @@ async def test_a_done_attempt_carries_its_verdict():
         await conn.close()
 
 
+# ── 308.1 review CR-02: an unfinished record is in flight only while it is really alive ─────────
+
+
+async def _set_finishing_at(conn, run_id, ago_seconds: float):
+    await conn.execute(
+        "UPDATE workflow_runs SET metadata = jsonb_set(metadata, '{publish,finishing_at}',"
+        " to_jsonb(now() - make_interval(secs => $2::float8))) WHERE id = $1",
+        run_id,
+        float(ago_seconds),
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ended", ["completed", "failed", "cancelled"])
+async def test_a_running_record_on_an_ended_run_is_not_in_flight(ended):
+    """CR-02: a Stop, a DB blip before the tail claim, or a dead tail left ``running`` on an ENDED
+    run. Counting it as in flight handed that dead run back to every POST for two hours."""
+    from app.db.workflows import active_publish_attempt
+
+    conn = await _temp_conn()
+    try:
+        definition_id, me = uuid.uuid4(), uuid.uuid4()
+        await _insert(conn, status=ended, publish=_record("running"),
+                      definition_id=definition_id, user_id=me, created_ago=60)
+        assert await active_publish_attempt(
+            conn, definition_id=definition_id, user_id=me,
+            max_age_seconds=7200, lease_seconds=LEASE,
+        ) is None
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_a_live_running_attempt_and_a_fresh_tail_claim_are_in_flight_a_stale_claim_is_not():
+    from app.db.workflows import active_publish_attempt
+
+    conn = await _temp_conn()
+    try:
+        me = uuid.uuid4()
+        live_def, fresh_def, stale_def = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+        live = await _insert(conn, status="active", publish=_record("running"),
+                             definition_id=live_def, user_id=me, created_ago=60)
+        fresh = await _insert(conn, status="completed", publish=_record("finishing"),
+                              definition_id=fresh_def, user_id=me, created_ago=60)
+        await _set_finishing_at(conn, fresh, 5)
+        stale = await _insert(conn, status="completed", publish=_record("finishing"),
+                              definition_id=stale_def, user_id=me, created_ago=900)
+        await _set_finishing_at(conn, stale, LEASE + 60)
+
+        async def _active(definition_id):
+            return await active_publish_attempt(
+                conn, definition_id=definition_id, user_id=me,
+                max_age_seconds=7200, lease_seconds=LEASE,
+            )
+
+        assert (await _active(live_def))["run_id"] == live
+        assert (await _active(fresh_def))["run_id"] == fresh
+        assert await _active(stale_def) is None
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_the_latest_attempt_says_whether_its_tail_is_stranded():
+    """CR-02 (c): the follow read is where a stranded tail is noticed while both workers are up,
+    so the read reports it: ``running`` on an ended run, or a ``finishing`` claim past the lease."""
+    from app.db.workflows import latest_publish_attempt
+
+    conn = await _temp_conn()
+    try:
+        me = uuid.uuid4()
+        cases = {}
+        for name, status, state, finishing_ago in [
+            ("running_on_ended", "cancelled", "running", None),
+            ("running_on_live", "active", "running", None),
+            ("finishing_stale", "completed", "finishing", LEASE + 60),
+            ("finishing_fresh", "completed", "finishing", 5),
+            ("done", "completed", "done", None),
+        ]:
+            definition_id = uuid.uuid4()
+            run_id = await _insert(conn, status=status, publish=_record(state),
+                                   definition_id=definition_id, user_id=me)
+            if finishing_ago is not None:
+                await _set_finishing_at(conn, run_id, finishing_ago)
+            cases[name] = definition_id
+        got = {
+            name: (await latest_publish_attempt(
+                conn, definition_id=d, user_id=me, lease_seconds=LEASE))["tail_stranded"]
+            for name, d in cases.items()
+        }
+        assert got == {
+            "running_on_ended": True,
+            "running_on_live": False,
+            "finishing_stale": True,
+            "finishing_fresh": False,
+            "done": False,
+        }
+    finally:
+        await conn.close()
+
+
 # ── find_publish_receipt ────────────────────────────────────────────────────────────────────────
 
 

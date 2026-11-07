@@ -555,6 +555,65 @@ async def test_a_cancel_before_the_drive_started_ends_the_run_and_records_a_verd
     assert env.verdict_written()["blocked_stage"] == "golden_run_error"
 
 
+@pytest.mark.asyncio
+async def test_a_tail_claim_that_raises_never_escapes_the_attempt_task():
+    """308.1 review CR-02 (b): ``claim_publish_tail`` sat outside any ``try``; a DB blip escaped
+    the task as an unretrieved exception. Now it is logged and the record stays ``running`` on an
+    ENDED run, which the follow read recovers (and which no longer blocks a new POST)."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with _Env(run_id) as env:
+        env.claim.side_effect = ConnectionResetError("db blip")
+        result = await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock())
+        assert result is None
+        await publish_attempt._attempt_task(run_id, pool=AsyncMock(), redis=AsyncMock())
+    env.tail.assert_not_awaited()
+    env.finish_attempt.assert_not_awaited()
+    env.finish_golden.assert_awaited()  # the run row itself was still ended by the drive
+
+
+@pytest.mark.asyncio
+async def test_a_verdict_write_that_blips_once_is_retried_and_lands():
+    """CR-02 (b): ``finish_publish_attempt`` sat outside the ``try``; one blip lost a computed
+    verdict (possibly a successful flip) and left ``finishing``. One retry lands it."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with _Env(run_id) as env:
+        env.finish_attempt.side_effect = [ConnectionResetError("db blip"), True]
+        verdict = await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock())
+    assert verdict == {"published": True, "version": 3, "golden_run_id": run_id}
+    assert env.finish_attempt.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_a_verdict_write_that_keeps_failing_never_raises():
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with _Env(run_id) as env:
+        env.finish_attempt.side_effect = ConnectionResetError("db down")
+        verdict = await publish_attempt.finish_attempt_tail(run_id, pool=AsyncMock())
+    assert verdict["published"] is True  # computed; the stale-finishing recovery re-records it
+
+
+@pytest.mark.asyncio
+async def test_a_record_read_that_raises_still_ends_the_run_with_words():
+    """CR-02 (b): ``load_publish_attempt`` raising left ``user_id`` unset, and the pre-drive arm
+    only ended the row when it knew the author, so the run stayed ``active`` until a restart."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    with _Env(run_id) as env:
+        env.load.side_effect = [ConnectionResetError("db blip"), env.attempt]
+        await publish_attempt._attempt_task(run_id, pool=AsyncMock(), redis=AsyncMock())
+    env.run_workflow.assert_not_awaited()
+    env.end_run.assert_awaited_once()
+    assert env.end_run.await_args.args[1:] == (run_id, "failed")
+    assert env.verdict_written()["blocked_stage"] == "golden_run_error"
+
+
 @pytest.mark.parametrize("ended_as", ["failed", "cancelled"])
 @pytest.mark.asyncio
 async def test_a_run_ended_without_a_failed_step_is_never_judged_on_the_ordinary_tail(ended_as):
