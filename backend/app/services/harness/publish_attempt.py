@@ -530,6 +530,16 @@ async def finish_attempt_tail(
                 golden_run_id=run_id,
                 blocked_step=await publish_tail._blocked_step_for_run(pool, run_id, definition),
             )
+        elif (
+            verdict := await _stopped_run_verdict(
+                pool, run_id, attempt=attempt, definition_id=definition_id, user_id=user_id
+            )
+        ) is not None:
+            # 308.1 review WR-03: the RUN ROW's status is read on every tail, not only on a
+            # recovered one. A run ended ``failed`` / ``cancelled`` with no failed step (a Stop,
+            # the circuit breaker, ``finish_golden_run``) is a failure in its own words; its
+            # partial output is never judged and never flipped, whichever path won the CAS.
+            pass
         else:
             # The outcome comes from the ROWS, never from in-memory drive state: a re-tail after a
             # dead worker has none (308.1-03), and the reconciler may have ended the run itself.
@@ -570,20 +580,10 @@ async def _recovered_verdict(pool, run_id, *, attempt, definition_id, user_id) -
     none). Re-running the tail would flip again, get -1 and record a FALSE ``already_published``.
     Without this run's receipt the ordinary tail runs, and its ``already_published`` is then true.
 
-    Pitfall 8: the run ended ``failed`` or ``cancelled`` with no ``failed`` step, so there is no
-    structural cause and no exception object. The verdict is ``golden_run_error`` carrying the
-    run's own recorded ``run_failed`` words (the generic golden words when none was recorded),
-    never a fabricated exception text; the time-limit words map to ``golden_run_timeout``. A run
-    with a ``failed`` step returns ``None``: the ordinary tail takes the structural-gate path.
+    Pitfall 8 is :func:`_stopped_run_verdict`, which every tail (not only a recovered one) now
+    asks before judging (308.1 review WR-03); it is not repeated here.
     """
-    from app.config import settings  # noqa: PLC0415
-    from app.db.workflows import (  # noqa: PLC0415
-        find_publish_receipt,
-        get_definition,
-        load_run_phases,
-    )
-    from app.services.harness import publish_service as _ps  # noqa: PLC0415
-    from app.services.harness.run_handoff import golden_end_reason  # noqa: PLC0415
+    from app.db.workflows import find_publish_receipt, get_definition  # noqa: PLC0415
 
     row = await get_definition(pool, definition_id, user_id=user_id)
     if row is not None and row.get("status") == "published":
@@ -594,6 +594,23 @@ async def _recovered_verdict(pool, run_id, *, attempt, definition_id, user_id) -
                 version = row.get("version")
             logger.info("publish: golden run %s had already published v%s", run_id, version)
             return {"published": True, "version": version, "golden_run_id": run_id}
+    return None
+
+
+async def _stopped_run_verdict(pool, run_id, *, attempt, definition_id, user_id) -> dict | None:
+    """Pitfall 8, asked by EVERY tail (308.1 review WR-03), or ``None`` for the judge path.
+
+    The run ROW ended ``failed`` or ``cancelled`` with no ``failed`` step, so there is no
+    structural cause and no exception object. The verdict is ``golden_run_error`` carrying the
+    run's own recorded ``run_failed`` words (the generic golden words when none was recorded),
+    never a fabricated exception text; the time-limit words map to ``golden_run_timeout``. A run
+    with a ``failed`` step returns ``None``: the ordinary tail takes the structural-gate path.
+    A ``completed`` (or still-live) row returns ``None`` without a read.
+    """
+    from app.config import settings  # noqa: PLC0415
+    from app.db.workflows import find_publish_receipt, load_run_phases  # noqa: PLC0415
+    from app.services.harness import publish_service as _ps  # noqa: PLC0415
+    from app.services.harness.run_handoff import golden_end_reason  # noqa: PLC0415
 
     if attempt.get("status") not in ("failed", "cancelled"):
         return None
