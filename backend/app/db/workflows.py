@@ -47,6 +47,7 @@ sweep re-runs it.
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 from datetime import datetime
@@ -2646,6 +2647,224 @@ async def touch_run_liveness(pool: asyncpg.Pool, run_id: UUID) -> None:
         "UPDATE workflow_runs SET updated_at = now() WHERE id = $1 AND status = 'active'",
         run_id,
     )
+
+
+# ── Phase 308.1 — the publish attempt record (BUG-261107-01) ─────────────────
+#
+# The golden run outlives the publish request (308.1-02), so everything the post-run stages
+# need lives on the golden run's own row, under ONE top-level key:
+# ``workflow_runs.metadata.publish = {state, stage0_token, golden_input, definition_id,
+# requested_by, finishing_at, verdict}`` with ``state`` in running | finishing | done.
+# Postgres is the record, never Redis or a worker-local dict: a killed worker loses those.
+# No migration — ``metadata`` exists since migration 125, and ``publish`` collides with none of
+# the keys already there (``max_tokens_per_run``, ``max_duration_seconds``, ``circuit_breaker``,
+# ``provider``). The generic resume finder is NOT touched (D-05 / D-12): golden runs never enter
+# the generic resume path.
+
+_PUBLISH_LOCK_SALT = 3081  # the advisory-lock key's salt; 308.1 — no other caller uses it
+
+
+def _decode_jsonb(value):
+    """A jsonb value read back as a ``str`` (a pre-dumped write, or an older row) decoded once."""
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except (TypeError, ValueError):
+            return None
+    return value
+
+
+async def write_publish_attempt(pool: asyncpg.Pool, run_id: UUID, publish: dict) -> None:
+    """Record (or replace) a golden run's publish attempt under ``metadata.publish`` (D-09).
+
+    ⚠ ``publish`` IS THE PLAIN DICT — NEVER A PRE-DUMPED STRING. The pool's jsonb codec
+    (``dependencies._init_pg_connection``) encodes it; a pre-encoded string lands as a jsonb
+    STRING SCALAR and every ``->`` read returns NULL (see ``record_circuit_breaker_trip``).
+    Every value in it must be a JSON primitive (UUIDs as ``str``).
+
+    ``COALESCE(metadata, '{}') ||`` MERGES: the run's other top-level keys survive.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY. This module writes through a service-role
+    pool that BYPASSES RLS; the predicate takes a key and no user-supplied filter, so ownership
+    is the CALLER's (T-147-06) — the publish path owner-checked the draft at stage 0.
+    """
+    await pool.execute(
+        "UPDATE workflow_runs "
+        "SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, updated_at = now() "
+        "WHERE id = $1 AND is_golden_run = true",
+        run_id,
+        # THE PLAIN DICT — see the codec paragraph above.
+        {"publish": publish},
+    )
+
+
+async def load_publish_attempt(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
+    """One golden run's row plus its publish record, for the background task and the sweep.
+
+    Returns ``run_id, thread_id, definition_id, user_id, status, created_at, inputs,
+    definition_snapshot, publish``; ``None`` for a missing or NON-golden row. ``inputs`` and
+    ``definition_snapshot`` are decoded to dicts when stored as strings (``create_workflow_run``
+    pre-dumps ``inputs``, so it IS a jsonb string scalar; older snapshot rows are strings too).
+    ``publish`` is the record as a dict, or ``None`` when the row carries none (a pre-308.1
+    orphan, or a string scalar) — the sweep needs to tell that case apart (D-14).
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS). The predicate
+    takes a key only; ownership is the CALLER's (T-147-06).
+    """
+    row = await pool.fetchrow(
+        "SELECT id, thread_id, definition_id, user_id, status, created_at, inputs,"
+        " definition_snapshot, metadata->'publish' AS publish "
+        "FROM workflow_runs WHERE id = $1 AND is_golden_run = true",
+        run_id,
+    )
+    if row is None:
+        return None
+    inputs = _decode_jsonb(row["inputs"])
+    snapshot = _decode_jsonb(row["definition_snapshot"])
+    publish = row["publish"]
+    return {
+        "run_id": row["id"],
+        "thread_id": row["thread_id"],
+        "definition_id": row["definition_id"],
+        "user_id": row["user_id"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "inputs": inputs if isinstance(inputs, dict) else {},
+        "definition_snapshot": snapshot if isinstance(snapshot, dict) else None,
+        "publish": publish if isinstance(publish, dict) else None,
+    }
+
+
+async def active_publish_attempt(
+    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID, max_age_seconds: int
+) -> dict | None:
+    """This user's newest UNFINISHED publish attempt on this draft, or ``None`` (D-10).
+
+    Unfinished = ``metadata.publish.state`` is ``running`` or ``finishing`` and the run started
+    within ``max_age_seconds`` (the publish budget — an attempt older than that is over, whatever
+    its record says). Another user's attempt, a ``done`` one and a non-golden row never match.
+    Returns ``{"run_id", "state", "created_at"}``.
+
+    Called under :func:`publish_attempt_lock`, so a second POST cannot slip in between this
+    check and the create (Pitfall 6).
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it filters on
+    the caller's own ``user_id``; ownership of the draft is the CALLER's (T-147-06).
+    """
+    row = await pool.fetchrow(
+        "SELECT id, metadata->'publish'->>'state' AS state, created_at "
+        "FROM workflow_runs "
+        "WHERE definition_id = $1 AND user_id = $2 AND is_golden_run = true "
+        "  AND jsonb_typeof(metadata->'publish') = 'object' "
+        "  AND metadata->'publish'->>'state' IN ('running', 'finishing') "
+        "  AND created_at > now() - make_interval(secs => $3) "
+        "ORDER BY created_at DESC LIMIT 1",
+        definition_id,
+        user_id,
+        max_age_seconds,
+    )
+    if row is None:
+        return None
+    return {"run_id": row["id"], "state": row["state"], "created_at": row["created_at"]}
+
+
+@contextlib.asynccontextmanager
+async def publish_attempt_lock(pool: asyncpg.Pool, definition_id: UUID):
+    """Hold a Postgres advisory lock keyed on the draft for the check-and-create (D-10).
+
+    Two workers can each take a publish POST for the same draft at the same instant; without a
+    lock both pass :func:`active_publish_attempt` and both start a golden run (double spend).
+    A SESSION advisory lock on ONE acquired connection serialises them across workers; the other
+    statements run on other pool connections while it is held. Released in ``finally``; asyncpg's
+    connection reset (``pg_advisory_unlock_all``) is the second net if the unlock itself fails.
+
+    The key is ``hashtextextended(<definition id>, 3081)`` — ``$1`` parameter only (T-091-03).
+    """
+    async with pool.acquire() as con:
+        await con.execute(
+            "SELECT pg_advisory_lock(hashtextextended($1::text, $2))",
+            str(definition_id),
+            _PUBLISH_LOCK_SALT,
+        )
+        try:
+            yield
+        finally:
+            await con.execute(
+                "SELECT pg_advisory_unlock(hashtextextended($1::text, $2))",
+                str(definition_id),
+                _PUBLISH_LOCK_SALT,
+            )
+
+
+async def claim_publish_tail(pool: asyncpg.Pool, run_id: UUID, lease_seconds: int) -> dict | None:
+    """CAS-claim a golden run's post-run tail: ``running -> finishing`` (D-17). One winner.
+
+    The tail (structural gate, argument check, judge, flip, audit) must run EXACTLY ONCE, and two
+    workers can both see the run end. One conditional ``UPDATE … RETURNING`` decides it — the
+    ``claim_run`` shape: the winner gets the record back (``state == "finishing"`` and a fresh
+    ``finishing_at``); every other caller gets ``None`` and runs nothing.
+
+    A ``finishing`` record whose ``finishing_at`` is older than ``lease_seconds`` is claimable
+    again: the worker that claimed it died mid-tail (the sweep's recovery arm, 308.1-03). A
+    ``done`` record, a non-golden row and a record stored as a jsonb STRING scalar never match.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it takes a key
+    and no user-supplied filter; ownership is the CALLER's (T-147-06). ``$N`` parameters only.
+    """
+    row = await pool.fetchrow(
+        """
+        UPDATE workflow_runs
+        SET metadata = jsonb_set(
+                metadata, '{publish}',
+                (metadata->'publish')
+                    || jsonb_build_object('state', 'finishing', 'finishing_at', now()))
+        WHERE id = $1
+          AND is_golden_run = true
+          AND jsonb_typeof(metadata->'publish') = 'object'
+          AND (   metadata->'publish'->>'state' = 'running'
+               OR (    metadata->'publish'->>'state' = 'finishing'
+                   AND (metadata->'publish'->>'finishing_at')::timestamptz
+                       < now() - make_interval(secs => $2)))
+        RETURNING metadata->'publish' AS publish
+        """,
+        run_id,
+        lease_seconds,
+    )
+    if row is None:
+        return None
+    publish = row["publish"]
+    return publish if isinstance(publish, dict) else None
+
+
+async def finish_publish_attempt(pool: asyncpg.Pool, run_id: UUID, verdict: dict) -> bool:
+    """Record the attempt's verdict and mark it ``done`` — only from ``finishing``, so once.
+
+    ``verdict`` is the PLAIN DICT, already JSON-safe (``jsonable_encoder``: a ``UUID`` would
+    make the codec's encoder raise — Pitfall 5); it lands as a jsonb OBJECT. Returns
+    True iff THIS call wrote it; a second call, or a call on a record that was never claimed,
+    changes nothing and returns False.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS); ownership is
+    the CALLER's (T-147-06).
+    """
+    row = await pool.fetchrow(
+        """
+        UPDATE workflow_runs
+        SET metadata = jsonb_set(
+                metadata, '{publish}',
+                (metadata->'publish')
+                    || jsonb_build_object('state', 'done', 'verdict', $2::jsonb))
+        WHERE id = $1
+          AND is_golden_run = true
+          AND jsonb_typeof(metadata->'publish') = 'object'
+          AND metadata->'publish'->>'state' = 'finishing'
+        RETURNING id
+        """,
+        run_id,
+        # THE PLAIN DICT — the codec encodes it.
+        verdict,
+    )
+    return row is not None
 
 
 # ── harness_audit (this table's own column IS run_id — correct) ──────────────
