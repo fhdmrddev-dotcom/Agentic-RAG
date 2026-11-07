@@ -524,7 +524,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/run_read_wire.py` | 3 / 3 / 183 (was `2 / 2 / 183`) | ⚠ now FIRES (306) · 306-04: mcp in ORIGIN_KINDS + RunOriginWire · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 15 / 13 / 556 (was `14 / 12 / 554`) | 296-07: blank label falls back to the key (287-IN-02) |
-| `frontend/src/components/workflows/PublishGauntlet.tsx` | 23 / 13 / 1487 (was `22 / 12 / 1390`) | 308.1-04: follow logic moved to usePublishAttempt; hero follows; live link · ⛔ |
+| `frontend/src/components/workflows/PublishGauntlet.tsx` | 24 / 13 / 1478 (was `23 / 13 / 1487`) | 308.1-REVIEW WR-05: progress step named from the run, not the draft · ⛔ |
 | `frontend/src/landing/facts.ts` | 9 / 5 / 546 (was `8 / 4 / 546`) | 308-05: Webhooks appended to SURFACE_TABS.settings (data only) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |

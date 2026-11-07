@@ -57,7 +57,6 @@ import {
   PUBLISH_PROGRESS,
   PUBLISH_PROGRESS_UNNAMED,
 } from "@/components/workflows/publishFollowVocabulary"
-import { nodeTitle, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 // Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
 // block. PREPEND ONLY: <WorkflowSoul scale="pub"> sits ABOVE the existing 8-stage
 // gauntlet ladder + verdict, which stay byte-behavior-identical (the ladder re-skin
@@ -732,32 +731,24 @@ function PublishingNotice({
 
 /**
  * 308.1-04 (D-22, UI-SPEC C-04 / C-05) — the ONE progress line while a run is followed. The
- * step is named in the AUTHOR's words: the definition's step title through `nodeTitle` when the
- * step resolves to a phase, else the server's authored `step_name`, else no name at all. The
- * slug is never a tier (sketch 215 #1).
+ * step is named in the AUTHOR's words, and only from the RUN: the server's `step_name`, which
+ * `GET /workflows/{id}/publish` resolves from the run's own `definition_snapshot`; else no name
+ * at all (C-04b). The slug is never a tier (sketch 215 #1).
+ *
+ * ⚠ 308.1 review WR-05 — NEVER FROM THE CURRENT DRAFT. This line used to look the step up in
+ * the Builder's live `definition` first. D-24 lets the author close the modal, edit the draft
+ * and reopen while the run goes on, so after a step was added, removed or reordered the line
+ * read "Step 2 of 5: <a step this run is not running>". The UI-SPEC's definition-first rule
+ * (§C-04 resolution) is superseded here for that reason.
  */
-function progressLineFor(
-  phase: UsePublishAttempt["phase"],
-  attempt: PublishAttempt | null,
-  definition?: DefShape | null,
-): string | null {
+function progressLineFor(phase: UsePublishAttempt["phase"], attempt: PublishAttempt | null): string | null {
   if (phase === "finishing") return PUBLISH_FOLLOW_COPY.finishing
   if (phase !== "running") return null
   const progress = attempt?.progress
   if (!progress || progress.step_index == null) return PUBLISH_FOLLOW_COPY.starting
   const index = progress.step_index
   const count = progress.step_count
-  const phases = Array.isArray(definition?.phases) ? definition.phases : []
-  const found = phases.find((p) => p?.phase_index === index - 1) ?? phases[index - 1]
-  const fromDefinition = found
-    ? nodeTitle({
-        slug: typeof found.slug === "string" ? found.slug : "",
-        phase_index: typeof found.phase_index === "number" ? found.phase_index : index - 1,
-        name: found.name ?? null,
-        config: (found.config ?? {}) as PhaseSpecJSON["config"],
-      }).trim()
-    : ""
-  const name = fromDefinition || progress.step_name?.trim() || ""
+  const name = progress.step_name?.trim() || ""
   return name ? PUBLISH_PROGRESS({ index, count, name }) : PUBLISH_PROGRESS_UNNAMED({ index, count })
 }
 
@@ -1084,7 +1075,7 @@ function GauntletContent({
         <PublishingNotice
           elapsedSec={elapsedSec}
           heading={phase === "finishing" ? PUBLISH_FOLLOW_COPY.headingFinishing : PUBLISH_FOLLOW_COPY.headingRunning}
-          progress={progressLineFor(phase, attempt, definition)}
+          progress={progressLineFor(phase, attempt)}
           followError={followError}
         />
       )}
