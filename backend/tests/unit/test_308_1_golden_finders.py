@@ -393,6 +393,54 @@ async def test_the_latest_attempt_says_whether_its_tail_is_stranded():
         await conn.close()
 
 
+# ── 308.1 review WR-06: a stranded tail past the publish budget is never judged ────────────────
+
+
+@pytest.mark.asyncio
+async def test_a_stranded_tail_past_the_budget_is_marked_expired():
+    """WR-06: the finder had no age bound and a recovered tail of a ``completed`` run goes judge ->
+    flip, so a worker that died days ago got its draft judged and PUBLISHED at the next reboot,
+    with nobody following. Past ``harness_publish_max_seconds`` (+ the lease) it is expired: the
+    sweep records the existing timeout verdict instead."""
+    from app.db.workflows import find_stranded_publish_tails
+
+    conn = await _temp_conn()
+    try:
+        young = await _insert(conn, status="completed", publish=_record(), created_ago=600)
+        old = await _insert(conn, status="completed", publish=_record(),
+                            created_ago=7200 + LEASE + 60)
+        rows = await find_stranded_publish_tails(conn, LEASE, max_age_seconds=7200)
+        expired = {r["run_id"]: r["expired"] for r in rows}
+        assert expired == {young: False, old: True}
+    finally:
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_the_latest_attempt_says_whether_it_is_past_the_budget():
+    from app.db.workflows import latest_publish_attempt
+
+    conn = await _temp_conn()
+    try:
+        me = uuid.uuid4()
+        young_def, old_def = uuid.uuid4(), uuid.uuid4()
+        await _insert(conn, status="completed", publish=_record(), definition_id=young_def,
+                      user_id=me, created_ago=600)
+        await _insert(conn, status="completed", publish=_record(), definition_id=old_def,
+                      user_id=me, created_ago=7200 + LEASE + 60)
+
+        async def _expired(d):
+            row = await latest_publish_attempt(
+                conn, definition_id=d, user_id=me, lease_seconds=LEASE, max_age_seconds=7200
+            )
+            return row["tail_expired"]
+
+        assert await _expired(young_def) is False
+        assert await _expired(old_def) is True
+    finally:
+        await conn.close()
+
+
 # ── find_publish_receipt ────────────────────────────────────────────────────────────────────────
 
 

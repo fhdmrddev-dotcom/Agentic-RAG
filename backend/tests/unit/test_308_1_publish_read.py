@@ -230,6 +230,18 @@ def test_a_stranded_tail_is_recovered_by_the_read_and_the_current_state_answered
     assert latest.await_args.kwargs["lease_seconds"] == settings.harness_resume_lease_seconds
 
 
+def test_a_stranded_tail_past_the_budget_is_recovered_as_a_timeout(client):
+    """308.1 review WR-06: an attempt past the publish budget is never judged when recovered."""
+    from app.config import settings
+
+    attempt = dict(_attempt("running"), status="completed", tail_stranded=True, tail_expired=True)
+    resp, recover, latest = _get_recovering(client, attempt)
+    assert resp.status_code == 200
+    recover.assert_called_once()
+    assert recover.call_args.kwargs["expired"] is True
+    assert latest.await_args.kwargs["max_age_seconds"] == settings.harness_publish_max_seconds
+
+
 @pytest.mark.parametrize("state", ["running", "finishing", "done"])
 def test_a_live_attempt_is_never_recovered_by_the_read(client, state):
     verdict = {"published": True, "version": 2, "golden_run_id": str(_RUN_ID)} if state == "done" else None

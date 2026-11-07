@@ -281,6 +281,44 @@ async def test_a_stranded_tail_is_a_spawned_recovered_tail():
 
 
 @pytest.mark.asyncio
+async def test_an_expired_stranded_tail_is_finished_as_a_timeout_never_judged():
+    """308.1 review WR-06: past the publish budget a stranded tail is recorded with the existing
+    ``golden_run_timeout`` words; the draft is never judged or flipped at some later reboot."""
+    from app.config import settings
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    pool = AsyncMock()
+    with (
+        _sweep(tails=[{"run_id": run_id, "status": "completed", "state": "running",
+                       "expired": True}]) as m,
+        patch.object(publish_attempt, "finish_attempt_tail", AsyncMock()) as tail,
+    ):
+        await publish_attempt.resume_stranded_golden_runs(pool=pool, redis=None)
+        await _drain()
+    tail.assert_awaited_once_with(run_id, pool=pool, recovered=True, timed_out=True)
+    assert m["tails"].await_args.args == (pool, settings.harness_resume_lease_seconds)
+    assert m["tails"].await_args.kwargs == {"max_age_seconds": settings.harness_publish_max_seconds}
+
+    # ...and through the real tail: the existing timeout words, no judge, no flip.
+    with (
+        patch.object(settings, "harness_publish_max_seconds", 60),
+        _recovered(run_id, status="completed") as env,
+    ):
+        await publish_attempt.finish_attempt_tail(
+            run_id, pool=AsyncMock(), recovered=True, timed_out=True
+        )
+    verdict = env.verdict_written()
+    assert verdict["blocked_stage"] == "golden_run_timeout"
+    assert verdict["named_failures"] == [
+        "the golden run exceeded the publish budget (60s) and was abandoned"
+    ]
+    env.tail.assert_not_awaited()
+    env.judge.assert_not_awaited()
+    env.flip.assert_not_awaited()
+
+
+@pytest.mark.asyncio
 async def test_the_sweep_never_touches_the_generic_resume_path():
     from app.services import harness_engine
     from app.services.harness import publish_attempt
