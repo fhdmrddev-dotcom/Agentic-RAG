@@ -2736,14 +2736,23 @@ async def load_publish_attempt(pool: asyncpg.Pool, run_id: UUID) -> dict | None:
 
 
 async def active_publish_attempt(
-    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID, max_age_seconds: int
+    pool: asyncpg.Pool,
+    *,
+    definition_id: UUID,
+    user_id: UUID,
+    max_age_seconds: int,
+    lease_seconds: int,
 ) -> dict | None:
-    """This user's newest UNFINISHED publish attempt on this draft, or ``None`` (D-10).
+    """This user's newest attempt on this draft that is REALLY in flight, or ``None`` (D-10).
 
-    Unfinished = ``metadata.publish.state`` is ``running`` or ``finishing`` and the run started
-    within ``max_age_seconds`` (the publish budget — an attempt older than that is over, whatever
-    its record says). Another user's attempt, a ``done`` one and a non-golden row never match.
-    Returns ``{"run_id", "state", "created_at"}``.
+    In flight = the run started within ``max_age_seconds`` (the publish budget) AND either its
+    record reads ``running`` while the run ROW is still live (``active`` / ``paused``), or it
+    reads ``finishing`` with a ``finishing_at`` younger than ``lease_seconds`` (a tail some worker
+    is running now). 308.1 review CR-02: a ``running`` record on an ENDED run (a Stop, a DB blip
+    before the tail claim) or a stale ``finishing`` claim used to count too, and handed that dead
+    run back to every POST for the whole budget; those are stranded tails now, recovered by the
+    follow read and the golden sweep, never a lock on the draft. Another user's attempt, a
+    ``done`` one and a non-golden row never match. Returns ``{"run_id", "state", "created_at"}``.
 
     Called under :func:`publish_attempt_lock`, so a second POST cannot slip in between this
     check and the create (Pitfall 6).
@@ -2756,12 +2765,16 @@ async def active_publish_attempt(
         "FROM workflow_runs "
         "WHERE definition_id = $1 AND user_id = $2 AND is_golden_run = true "
         "  AND jsonb_typeof(metadata->'publish') = 'object' "
-        "  AND metadata->'publish'->>'state' IN ('running', 'finishing') "
+        "  AND (   (metadata->'publish'->>'state' = 'running' AND status IN ('active', 'paused'))"
+        "       OR (    metadata->'publish'->>'state' = 'finishing'"
+        "           AND (metadata->'publish'->>'finishing_at')::timestamptz"
+        "               > now() - make_interval(secs => $4))) "
         "  AND created_at > now() - make_interval(secs => $3) "
         "ORDER BY created_at DESC LIMIT 1",
         definition_id,
         user_id,
         max_age_seconds,
+        lease_seconds,
     )
     if row is None:
         return None
@@ -2933,13 +2946,19 @@ async def find_stranded_publish_tails(pool: asyncpg.Pool, lease_seconds: int) ->
 
 
 async def latest_publish_attempt(
-    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID
+    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID, lease_seconds: int
 ) -> dict | None:
     """The caller's newest publish attempt on a draft, for ``GET /workflows/{id}/publish`` (D-20).
 
-    Returns ``run_id, status, created_at, definition_snapshot (dict | None), state, verdict``, or
-    ``None``. Only the record's ``state`` and ``verdict`` leave this function: the record's
-    ``golden_input`` and ``stage0_token`` are never selected, so no caller can leak them.
+    Returns ``run_id, status, created_at, definition_snapshot (dict | None), state, verdict,
+    tail_stranded``, or ``None``. Only the record's ``state`` and ``verdict`` leave this function:
+    the record's ``golden_input`` and ``stage0_token`` are never selected, so no caller can leak
+    them.
+
+    ``tail_stranded`` (308.1 review CR-02) is the golden sweep's arm-B shape computed for this one
+    row, with the database's own clock: the record reads ``running`` on an ENDED run, or reads
+    ``finishing`` with a ``finishing_at`` older than ``lease_seconds``. The follow read uses it to
+    recover the tail while both workers stay up, instead of waiting for the next boot.
 
     ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it filters on
     the caller's own ``user_id`` (another user's attempt never matches); ownership of the draft is
@@ -2947,13 +2966,21 @@ async def latest_publish_attempt(
     """
     row = await pool.fetchrow(
         "SELECT id, status, created_at, definition_snapshot,"
-        " metadata->'publish'->>'state' AS state, metadata->'publish'->'verdict' AS verdict "
+        " metadata->'publish'->>'state' AS state, metadata->'publish'->'verdict' AS verdict,"
+        " COALESCE("
+        "   (metadata->'publish'->>'state' = 'running'"
+        "      AND status IN ('completed', 'failed', 'cancelled'))"
+        "   OR (metadata->'publish'->>'state' = 'finishing'"
+        "      AND (metadata->'publish'->>'finishing_at')::timestamptz"
+        "          < now() - make_interval(secs => $3)),"
+        "   false) AS tail_stranded "
         "FROM workflow_runs "
         "WHERE definition_id = $1 AND user_id = $2 AND is_golden_run = true "
         "  AND jsonb_typeof(metadata->'publish') = 'object' "
         "ORDER BY created_at DESC LIMIT 1",
         definition_id,
         user_id,
+        lease_seconds,
     )
     if row is None:
         return None
@@ -2966,6 +2993,7 @@ async def latest_publish_attempt(
         "definition_snapshot": snapshot if isinstance(snapshot, dict) else None,
         "state": row["state"],
         "verdict": verdict if isinstance(verdict, dict) else None,
+        "tail_stranded": bool(row["tail_stranded"]),
     }
 
 

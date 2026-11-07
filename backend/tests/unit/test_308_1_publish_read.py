@@ -138,7 +138,13 @@ def test_a_running_attempt_reports_the_authored_step_its_position_and_the_run_st
             "started_at": "2026-11-07T09:30:00Z",
         },
     }
-    assert latest.await_args.kwargs == {"definition_id": _DEF_ID, "user_id": UUID(_ME)}
+    from app.config import settings
+
+    assert latest.await_args.kwargs == {
+        "definition_id": _DEF_ID,
+        "user_id": UUID(_ME),
+        "lease_seconds": settings.harness_resume_lease_seconds,  # 308.1 review CR-02
+    }
     assert get_def.await_args.kwargs["user_id"] == UUID(_ME)
 
 

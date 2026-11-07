@@ -175,6 +175,7 @@ async def begin_background_attempt(
                 definition_id=definition_id,
                 user_id=user_id,
                 max_age_seconds=settings.harness_publish_max_seconds,
+                lease_seconds=settings.harness_resume_lease_seconds,
             )
             if existing is not None:
                 logger.info(
@@ -238,6 +239,18 @@ def spawn_attempt(run_id, *, pool, redis) -> asyncio.Task:
     return _spawn(_attempt_task(run_id, pool=pool, redis=redis), name=f"publish-attempt-{run_id}")
 
 
+def recover_publish_tail(run_id, *, pool) -> asyncio.Task:
+    """Spawn a recovered tail (``finish_attempt_tail(recovered=True)``) for a stranded record.
+
+    The ONE recovery entry, shared by the golden sweep's arm B and (308.1 review CR-02) the
+    follow read, which notices a stranded tail while both workers stay up. Spawned, never
+    awaited; the tail CAS decides the single winner, so a second spawn for the same run (two
+    polls, or a poll and the sweep) runs nothing."""
+    return _spawn(
+        finish_attempt_tail(run_id, pool=pool, recovered=True), name=f"publish-tail-{run_id}"
+    )
+
+
 async def resume_stranded_golden_runs(*, pool, redis) -> int:
     """The golden sweep (D-11..D-14, D-17): act on golden runs and tails a dead worker left.
 
@@ -293,9 +306,7 @@ async def resume_stranded_golden_runs(*, pool, redis) -> int:
     for row in tails:
         run_id = row["run_id"]
         logger.info("publish: finishing the stranded publish tail of golden run %s", run_id)
-        _spawn(
-            finish_attempt_tail(run_id, pool=pool, recovered=True), name=f"publish-tail-{run_id}"
-        )
+        recover_publish_tail(run_id, pool=pool)
         acted += 1
     return acted
 
@@ -470,8 +481,10 @@ async def finish_attempt_tail(
     become strings, Pitfall 5) with ``state: done``, exactly once.
 
     If the tail itself raises after the claim, the record stays ``finishing``; once that claim is
-    older than ``harness_resume_lease_seconds`` it is claimable again (the sweep's recovery arm).
-    Returns the verdict, or ``None`` when nothing was recorded here.
+    older than ``harness_resume_lease_seconds`` it is claimable again, and the follow read
+    (``GET /workflows/{id}/publish``) or the golden sweep recovers it (308.1 review CR-02). A claim
+    or verdict write that raises never escapes (CR-02). Returns the verdict, or ``None`` when no
+    tail ran here.
 
     ``recovered=True`` is the sweep's arm B (308.1-03): no drive state exists, so
     :func:`_recovered_verdict` first answers the two cases rows alone can settle (Pitfall 7 and 8);
@@ -490,7 +503,13 @@ async def finish_attempt_tail(
     from app.services.harness import publish_service as _ps  # noqa: PLC0415
     from app.services.harness import publish_tail  # noqa: PLC0415
 
-    record = await claim_publish_tail(pool, run_id, settings.harness_resume_lease_seconds)
+    try:
+        record = await claim_publish_tail(pool, run_id, settings.harness_resume_lease_seconds)
+    except Exception:  # noqa: BLE001 — CR-02: never an unretrieved task exception
+        # The record stays ``running`` on an ENDED run: no longer counted as in flight
+        # (``active_publish_attempt``), and recovered by the follow read or the golden sweep.
+        logger.exception("publish: the tail of golden run %s could not be claimed", run_id)
+        return None
     if record is None:
         logger.info("publish: the tail of golden run %s belongs to another claim", run_id)
         return None
@@ -563,11 +582,27 @@ async def finish_attempt_tail(
                 tool_schemas=tool_schemas,
                 stage0_token=record.get("stage0_token"),
             )
-    except Exception:  # noqa: BLE001 — the claim lapses; the sweep's stale-finishing arm re-runs it
+    except Exception:  # noqa: BLE001 — the claim lapses; the stale-finishing recovery re-runs it
         logger.exception("publish: the tail of golden run %s failed after its claim", run_id)
         return None
 
-    await finish_publish_attempt(pool, run_id, jsonable_encoder(verdict))
+    # CR-02: the verdict write was outside any guard; one blip lost a computed verdict (possibly a
+    # flip that already happened). One retry; if it still fails the record stays ``finishing``,
+    # and once that claim is older than the lease the follow read / sweep recover it (a flip is
+    # then recognised by its ``publish_succeeded`` receipt, Pitfall 7). Never raises.
+    payload = jsonable_encoder(verdict)
+    for attempt_no in (1, 2):
+        try:
+            await finish_publish_attempt(pool, run_id, payload)
+            break
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "publish: the verdict of golden run %s could not be recorded (try %s)",
+                run_id,
+                attempt_no,
+            )
+            if attempt_no == 1:
+                await asyncio.sleep(0.5)
     return verdict
 
 

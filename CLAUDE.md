@@ -454,7 +454,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/hooks/useThreads.ts` | 9 / 5 / 128 (was `8 / 4 / 121`) | 299-05: pending flag (one const + one key) · ⛔ |
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
-| `backend/app/db/workflows.py` | 68 / 34 / 3251 (was `67 / 34 / 3127`) | 308.1-03: four reads (two sweep finders, latest attempt, receipt) · ⛔ |
+| `backend/app/db/workflows.py` | 69 / 34 / 3279 (was `68 / 34 / 3251`) | 308.1-REVIEW CR-02: in-flight = live run or fresh claim; tail_stranded · ⛔ |
 | `backend/app/services/harness/publish_service.py` | 39 / 18 / 1143 (was `38 / 18 / 1053`) | 308.1-02: stages 0-2.6 in _pre_run; start_publish added · ⛔ |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |

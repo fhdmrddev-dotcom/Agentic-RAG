@@ -149,9 +149,30 @@ async def get_publish_attempt(
     if row is None or str(row.get("created_by")) != str(user_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=_NOT_FOUND)
 
-    attempt = await latest_publish_attempt(pool, definition_id=definition_id, user_id=user_id)
+    from app.config import settings  # noqa: PLC0415
+
+    attempt = await latest_publish_attempt(
+        pool,
+        definition_id=definition_id,
+        user_id=user_id,
+        lease_seconds=settings.harness_resume_lease_seconds,
+    )
     if attempt is None:
         return PublishAttempt(state="none")
+
+    if attempt.get("tail_stranded"):
+        # 308.1 review CR-02: a record left ``running`` on an ENDED run, or a dead ``finishing``
+        # claim, used to wait for the next worker boot (the screen polled until then). The read
+        # that notices it spawns the recovered tail (the CAS keeps it exactly-once) and answers
+        # what it found; the next poll reads the verdict. Never a failed read because of it.
+        try:
+            from app.services.harness.publish_attempt import (  # noqa: PLC0415
+                recover_publish_tail,
+            )
+
+            recover_publish_tail(attempt["run_id"], pool=pool)
+        except Exception:  # noqa: BLE001 — the golden sweep is the second net
+            logger.exception("publish: could not recover the tail of %s", attempt["run_id"])
 
     state = attempt.get("state")
     verdict = attempt.get("verdict")

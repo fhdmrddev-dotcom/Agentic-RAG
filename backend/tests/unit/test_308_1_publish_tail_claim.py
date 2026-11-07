@@ -348,14 +348,21 @@ async def test_active_attempt_is_this_users_newest_running_or_finishing_one():
             conn, definition_id=definition_id, user_id=user_id,
             metadata={"publish": _record("finishing")}, created_ago=10,
         )
+        # 308.1 review CR-02: a ``finishing`` record is in flight only while its claim is fresh;
+        # the claim always stamps ``finishing_at`` (a NULL one is a shape no writer produces).
+        await conn.execute(
+            "UPDATE workflow_runs SET metadata = jsonb_set(metadata, '{publish,finishing_at}',"
+            " to_jsonb(now())) WHERE id = $1",
+            newest,
+        )
         got = await active_publish_attempt(
-            conn, definition_id=definition_id, user_id=user_id, max_age_seconds=7200
+            conn, definition_id=definition_id, user_id=user_id, max_age_seconds=7200, lease_seconds=LEASE
         )
         assert got is not None
         assert got["run_id"] == newest
         assert got["state"] == "finishing"
         assert await active_publish_attempt(
-            conn, definition_id=definition_id, user_id=other_user, max_age_seconds=7200
+            conn, definition_id=definition_id, user_id=other_user, max_age_seconds=7200, lease_seconds=LEASE
         ) is None
     finally:
         await conn.close()
@@ -377,7 +384,7 @@ async def test_active_attempt_ignores_done_old_and_non_golden_rows():
         await _insert(conn, definition_id=definition_id, user_id=user_id,
                       metadata={"publish": json.dumps(_record("running"))})
         assert await active_publish_attempt(
-            conn, definition_id=definition_id, user_id=user_id, max_age_seconds=7200
+            conn, definition_id=definition_id, user_id=user_id, max_age_seconds=7200, lease_seconds=LEASE
         ) is None
     finally:
         await conn.close()

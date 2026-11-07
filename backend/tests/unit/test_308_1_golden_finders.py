@@ -243,7 +243,9 @@ async def test_the_latest_attempt_is_the_callers_newest_record_for_that_draft():
         await _insert(conn, publish=_record(), definition_id=definition_id, user_id=other)
         await _insert(conn, definition_id=definition_id, user_id=me)
         await _insert(conn, publish=_record(), user_id=me)
-        row = await latest_publish_attempt(conn, definition_id=definition_id, user_id=me)
+        row = await latest_publish_attempt(
+            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE
+        )
         assert row["run_id"] == newest
         assert row["state"] == "running"
         assert row["verdict"] is None
@@ -266,7 +268,7 @@ async def test_another_users_attempt_is_never_the_latest():
         definition_id = uuid.uuid4()
         await _insert(conn, publish=_record(), definition_id=definition_id, user_id=uuid.uuid4())
         assert await latest_publish_attempt(
-            conn, definition_id=definition_id, user_id=uuid.uuid4()
+            conn, definition_id=definition_id, user_id=uuid.uuid4(), lease_seconds=LEASE
         ) is None
     finally:
         await conn.close()
@@ -282,7 +284,9 @@ async def test_a_done_attempt_carries_its_verdict():
         verdict = {"published": True, "version": 3, "golden_run_id": "x"}
         await _insert(conn, status="completed", publish=_record("done", verdict=verdict),
                       definition_id=definition_id, user_id=me)
-        row = await latest_publish_attempt(conn, definition_id=definition_id, user_id=me)
+        row = await latest_publish_attempt(
+            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE
+        )
         assert row["state"] == "done" and row["verdict"] == verdict
     finally:
         await conn.close()
