@@ -555,6 +555,32 @@ async def test_a_cancel_before_the_drive_started_ends_the_run_and_records_a_verd
     assert env.verdict_written()["blocked_stage"] == "golden_run_error"
 
 
+@pytest.mark.parametrize("ended_as", ["failed", "cancelled"])
+@pytest.mark.asyncio
+async def test_a_run_ended_without_a_failed_step_is_never_judged_on_the_ordinary_tail(ended_as):
+    """308.1 review WR-03: the ordinary tail used to read only the STEP rows ("any step failed ->
+    failed, else completed"), so a run the circuit breaker, ``finish_golden_run`` or a Stop
+    ended with no ``failed`` step was harvested as ``completed`` and its partial output went to
+    the judge (and, on a pass, to the flip). The recovered tail already treats that row as a
+    failure; the verdict must not depend on which path wins the CAS."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    reason = "The trial run stopped because of an error (CircuitBreakerTripped)."
+
+    with _Env(run_id) as env, _recovery_reads(receipts={"run_failed": {"reason": reason}}):
+        async def _drive():
+            env.attempt["status"] = ended_as  # the row was ended under the drive
+
+        env.drive = _drive
+        await publish_attempt._attempt_task(run_id, pool=AsyncMock(), redis=AsyncMock())
+    env.tail.assert_not_awaited()  # no judge, no flip
+    verdict = env.verdict_written()
+    assert verdict["blocked_stage"] == "golden_run_error"
+    assert verdict["named_failures"] == [f"golden run could not complete: {reason}"]
+    assert verdict["golden_run_id"] == str(run_id)
+
+
 @pytest.mark.asyncio
 async def test_drive_created_ends_the_run_on_a_cancel_that_is_not_a_shutdown():
     run_id = uuid4()
