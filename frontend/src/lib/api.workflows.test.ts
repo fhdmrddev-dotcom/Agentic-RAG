@@ -30,6 +30,9 @@ import {
   deleteWorkflowDraft,
   generateWorkflow,
   publishWorkflow,
+  getPublishAttempt,
+  ApiError,
+  type PublishAttempt,
   WorkflowConflictError,
   WorkflowNotFoundError,
   WorkflowStaleTokenError,
@@ -139,6 +142,81 @@ describe("publishWorkflow — the 4 distinct HTTP outcomes (no binary 200/else h
   it("an unexpected status (500) throws (never silently treated as a verdict)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(500, { detail: "boom" })))
     await expect(publishWorkflow("wf-1", "x")).rejects.toThrow()
+  })
+})
+
+describe("308.1-04 (D-08) — publishWorkflow's 202 handle is not a verdict", () => {
+  it("a 202 maps to kind:'running' carrying the handle", async () => {
+    const handle = {
+      published: false,
+      version: null,
+      golden_run_id: "run-7",
+      blocked_stage: null,
+      named_failures: [],
+      state: "running",
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(202, handle)))
+    const out = await publishWorkflow("wf-1", "x")
+    expect(out.kind).toBe("running")
+    if (out.kind !== "running") throw new Error("expected a running outcome")
+    expect(out.verdict.golden_run_id).toBe("run-7")
+    expect(out.verdict.state).toBe("running")
+  })
+
+  it("a 200 WITH a state key is still a verdict", async () => {
+    const verdict = {
+      published: true,
+      version: 3,
+      golden_run_id: "run-8",
+      blocked_stage: null,
+      named_failures: [],
+      state: "done",
+    }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(200, verdict)))
+    const out = await publishWorkflow("wf-1", "x")
+    expect(out.kind).toBe("verdict")
+  })
+
+  it("a 200 with NO state key is a verdict (an old server's synchronous answer)", async () => {
+    const verdict = { published: false, version: null, golden_run_id: null, blocked_stage: "lint", named_failures: [] }
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(200, verdict)))
+    const out = await publishWorkflow("wf-1", "x")
+    expect(out.kind).toBe("verdict")
+    if (out.kind !== "verdict") throw new Error("expected a verdict")
+    expect(out.verdict.blocked_stage).toBe("lint")
+  })
+})
+
+describe("308.1-04 (D-20) — getPublishAttempt reads where an attempt is", () => {
+  it("a 200 returns the parsed attempt, from the encoded URL, with auth headers", async () => {
+    const body: PublishAttempt = {
+      state: "running",
+      golden_run_id: "run-1",
+      verdict: null,
+      progress: { step_index: 2, step_count: 5, step_name: "Collect evidence", started_at: "2026-11-07T10:00:00Z" },
+    }
+    const spy = vi.fn().mockResolvedValue(jsonRes(200, body))
+    vi.stubGlobal("fetch", spy)
+    const out = await getPublishAttempt("a/b")
+    expect(out).toEqual(body)
+    const [url, init] = spy.mock.calls[0]
+    expect(url).toBe("http://localhost:8000/workflows/a%2Fb/publish")
+    expect((init as RequestInit).method ?? "GET").toBe("GET")
+    expect(JSON.stringify((init as RequestInit).headers)).toContain("tok-123")
+  })
+
+  it("a 404 throws an ApiError carrying the status (so a caller can tell it from a blip)", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(404, { detail: "workflow not found" })))
+    const err = await getPublishAttempt("wf-1").catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(404)
+  })
+
+  it("a 500 throws an ApiError with status 500", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonRes(500, { detail: "boom" })))
+    const err = await getPublishAttempt("wf-1").catch((e: unknown) => e)
+    expect(err).toBeInstanceOf(ApiError)
+    expect((err as ApiError).status).toBe(500)
   })
 })
 
