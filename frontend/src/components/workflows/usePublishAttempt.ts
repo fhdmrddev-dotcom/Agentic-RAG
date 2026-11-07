@@ -95,9 +95,11 @@ export function usePublishAttempt({
   const [clickMs, setClickMs] = useState<number | null>(null)
   const [nowMs, setNowMs] = useState(() => Date.now())
 
-  /** Stale-response guard: bumped by every read, submit, reset and close; only the newest
-   *  request may write. */
+  /** Stale-response guard: bumped by every open read, submit, reset and close (never by a
+   *  poll, WR-01); only an answer to the current generation may write. */
   const currentAttemptRef = useRef(0)
+  /** WR-01: a follow read is pending; the next tick waits for it instead of superseding it. */
+  const pollInFlightRef = useRef(false)
   const failuresRef = useRef(0)
   /** onPublished fires once per golden_run_id per mount (D-UI-07). */
   const firedForRef = useRef<Set<string>>(new Set())
@@ -138,13 +140,22 @@ export function usePublishAttempt({
   }, [])
 
   /** One read while following. A 404 (or the attempt gone) is `lost`; anything else that
-   *  fails is transient and changes nothing but the follow-error count. */
+   *  fails is transient and changes nothing but the follow-error count.
+   *
+   *  308.1 review WR-01: a poll NEVER invalidates the read before it. It used to bump the
+   *  request counter, so with every GET slower than POLL_MS (a starved host) the next tick
+   *  dropped the read in flight and no answer, and no failure, ever landed. Now a tick is
+   *  skipped while a read is pending, and the counter is bumped only by open/close, submit
+   *  and reset, which are the only events that make an in-flight answer stale. */
   const poll = useCallback(async () => {
-    const id = ++currentAttemptRef.current
+    if (pollInFlightRef.current) return
+    pollInFlightRef.current = true
+    const id = currentAttemptRef.current
     let a: PublishAttempt
     try {
       a = await readRef.current(definitionId)
     } catch (e) {
+      pollInFlightRef.current = false
       if (id !== currentAttemptRef.current) return
       if (statusOf(e) === 404) {
         setAttempt(null)
@@ -156,6 +167,7 @@ export function usePublishAttempt({
       if (failuresRef.current >= FOLLOW_ERROR_AFTER) setFollowError(true)
       return
     }
+    pollInFlightRef.current = false
     if (id !== currentAttemptRef.current) return
     failuresRef.current = 0
     setFollowError(false)

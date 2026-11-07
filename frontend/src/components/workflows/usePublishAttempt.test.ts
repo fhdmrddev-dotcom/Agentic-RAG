@@ -272,20 +272,25 @@ describe("usePublishAttempt — following (D-19)", () => {
     expect(hook.result.current.goldenRunId).toBe("run-2")
   })
 
-  it("a late answer to an earlier read is ignored (stale-response guard)", async () => {
+  it("a late answer to a read sent before a close/reopen is ignored (stale-response guard)", async () => {
+    // 308.1 review WR-01: a poll no longer supersedes the poll before it (a slow read is waited
+    // for, see below). What makes an in-flight answer stale is a close/reopen, submit or reset.
     const { hook, read } = setup(() => Promise.resolve(running()))
     await flush()
     let releaseSlow: (a: PublishAttempt) => void = () => {}
     read.mockImplementationOnce(() => new Promise<PublishAttempt>((r) => (releaseSlow = r)))
+    await flush(3_000) // slow poll sent
+    hook.rerender({ open: false })
     read.mockImplementationOnce(() => Promise.resolve(running({ state: "finishing" })))
-    await flush(3_000) // slow read sent
-    await flush(3_000) // newer read answers finishing
+    hook.rerender({ open: true })
+    await flush() // the reopen read answers finishing
     expect(hook.result.current.phase).toBe("finishing")
     await act(async () => {
-      releaseSlow(running())
+      releaseSlow(done(verdict()))
       await vi.advanceTimersByTimeAsync(0)
     })
     expect(hook.result.current.phase).toBe("finishing")
+    expect(hook.result.current.outcome).toBeNull()
   })
 })
 
