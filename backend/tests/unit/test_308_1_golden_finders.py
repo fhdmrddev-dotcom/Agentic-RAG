@@ -182,7 +182,7 @@ async def test_a_terminal_run_whose_record_still_reads_running_is_a_stranded_tai
             s: await _insert(conn, publish=_record(), status=s, updated_ago=1)
             for s in ("completed", "failed", "cancelled")
         }
-        rows = await find_stranded_publish_tails(conn, LEASE)
+        rows = await find_stranded_publish_tails(conn, LEASE, max_age_seconds=7200)
         assert _ids(rows) == set(ended.values())
     finally:
         await conn.close()
@@ -202,7 +202,7 @@ async def test_a_stale_finishing_claim_is_a_stranded_tail_and_a_fresh_one_is_not
             " to_jsonb(now())) WHERE id <> $1",
             stale,
         )
-        assert _ids(await find_stranded_publish_tails(conn, LEASE)) == {stale}
+        assert _ids(await find_stranded_publish_tails(conn, LEASE, max_age_seconds=7200)) == {stale}
     finally:
         await conn.close()
 
@@ -220,7 +220,7 @@ async def test_done_active_and_non_golden_rows_are_never_stranded_tails():
         await _insert(conn, status="completed", golden=False, publish=_record())
         await _insert(conn, status="completed")  # no record at all
         await _insert(conn, status="completed", metadata={"publish": json.dumps(_record())})
-        assert await find_stranded_publish_tails(conn, LEASE) == []
+        assert await find_stranded_publish_tails(conn, LEASE, max_age_seconds=7200) == []
     finally:
         await conn.close()
 
@@ -244,7 +244,7 @@ async def test_the_latest_attempt_is_the_callers_newest_record_for_that_draft():
         await _insert(conn, definition_id=definition_id, user_id=me)
         await _insert(conn, publish=_record(), user_id=me)
         row = await latest_publish_attempt(
-            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE
+            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE, max_age_seconds=7200
         )
         assert row["run_id"] == newest
         assert row["state"] == "running"
@@ -268,7 +268,7 @@ async def test_another_users_attempt_is_never_the_latest():
         definition_id = uuid.uuid4()
         await _insert(conn, publish=_record(), definition_id=definition_id, user_id=uuid.uuid4())
         assert await latest_publish_attempt(
-            conn, definition_id=definition_id, user_id=uuid.uuid4(), lease_seconds=LEASE
+            conn, definition_id=definition_id, user_id=uuid.uuid4(), lease_seconds=LEASE, max_age_seconds=7200
         ) is None
     finally:
         await conn.close()
@@ -285,7 +285,7 @@ async def test_a_done_attempt_carries_its_verdict():
         await _insert(conn, status="completed", publish=_record("done", verdict=verdict),
                       definition_id=definition_id, user_id=me)
         row = await latest_publish_attempt(
-            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE
+            conn, definition_id=definition_id, user_id=me, lease_seconds=LEASE, max_age_seconds=7200
         )
         assert row["state"] == "done" and row["verdict"] == verdict
     finally:
@@ -379,7 +379,8 @@ async def test_the_latest_attempt_says_whether_its_tail_is_stranded():
             cases[name] = definition_id
         got = {
             name: (await latest_publish_attempt(
-                conn, definition_id=d, user_id=me, lease_seconds=LEASE))["tail_stranded"]
+                conn, definition_id=d, user_id=me, lease_seconds=LEASE, max_age_seconds=7200,
+            ))["tail_stranded"]
             for name, d in cases.items()
         }
         assert got == {

@@ -2911,13 +2911,20 @@ async def find_stranded_golden_runs(pool: asyncpg.Pool, lease_seconds: int) -> l
     return [dict(r) for r in rows]
 
 
-async def find_stranded_publish_tails(pool: asyncpg.Pool, lease_seconds: int) -> list[dict]:
+async def find_stranded_publish_tails(
+    pool: asyncpg.Pool, lease_seconds: int, *, max_age_seconds: int
+) -> list[dict]:
     """Ended golden runs whose publish tail never finished (D-17 recovery).
 
     Two shapes: the record still reads ``running`` on a run that is ``completed`` / ``failed`` /
     ``cancelled`` (its worker died before claiming the tail), or it reads ``finishing`` with a
     ``finishing_at`` older than the lease (its worker died mid-tail). Never a ``done`` record,
     never an ``active`` run, never a non-golden row, never a string scalar.
+
+    ``expired`` (308.1 review WR-06): the run started more than ``max_age_seconds`` (the publish
+    budget) plus the lease ago. Such a tail is still returned, so its record gets finished, but
+    the sweep records the existing ``golden_run_timeout`` verdict instead of judging it: a draft
+    must never be judged and PUBLISHED at some later reboot with nobody following the attempt.
 
     ⚠ A TERMINAL RUN NEEDS NO STALENESS CHECK, and adding one would hide exactly the run this
     exists for: the periodic reconciler (``run_reconciler._reconcile_workflow_runs``) finalises a
@@ -2929,7 +2936,8 @@ async def find_stranded_publish_tails(pool: asyncpg.Pool, lease_seconds: int) ->
     """
     rows = await pool.fetch(
         """
-        SELECT id AS run_id, status, metadata->'publish'->>'state' AS state
+        SELECT id AS run_id, status, metadata->'publish'->>'state' AS state,
+               created_at < now() - make_interval(secs => $2::float8 + $1::float8) AS expired
         FROM workflow_runs
         WHERE is_golden_run = true
           AND status IN ('completed', 'failed', 'cancelled')
@@ -2941,12 +2949,18 @@ async def find_stranded_publish_tails(pool: asyncpg.Pool, lease_seconds: int) ->
         ORDER BY created_at
         """,
         lease_seconds,
+        max_age_seconds,
     )
     return [dict(r) for r in rows]
 
 
 async def latest_publish_attempt(
-    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID, lease_seconds: int
+    pool: asyncpg.Pool,
+    *,
+    definition_id: UUID,
+    user_id: UUID,
+    lease_seconds: int,
+    max_age_seconds: int,
 ) -> dict | None:
     """The caller's newest publish attempt on a draft, for ``GET /workflows/{id}/publish`` (D-20).
 
@@ -2959,6 +2973,8 @@ async def latest_publish_attempt(
     row, with the database's own clock: the record reads ``running`` on an ENDED run, or reads
     ``finishing`` with a ``finishing_at`` older than ``lease_seconds``. The follow read uses it to
     recover the tail while both workers stay up, instead of waiting for the next boot.
+    ``tail_expired`` (WR-06) is :func:`find_stranded_publish_tails`' ``expired``: past the
+    publish budget plus the lease, a recovered tail records the timeout and is never judged.
 
     ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it filters on
     the caller's own ``user_id`` (another user's attempt never matches); ownership of the draft is
@@ -2972,8 +2988,9 @@ async def latest_publish_attempt(
         "      AND status IN ('completed', 'failed', 'cancelled'))"
         "   OR (metadata->'publish'->>'state' = 'finishing'"
         "      AND (metadata->'publish'->>'finishing_at')::timestamptz"
-        "          < now() - make_interval(secs => $3)),"
-        "   false) AS tail_stranded "
+        "          < now() - make_interval(secs => $3::float8)),"
+        "   false) AS tail_stranded,"
+        " created_at < now() - make_interval(secs => $4::float8 + $3::float8) AS tail_expired "
         "FROM workflow_runs "
         "WHERE definition_id = $1 AND user_id = $2 AND is_golden_run = true "
         "  AND jsonb_typeof(metadata->'publish') = 'object' "
@@ -2981,6 +2998,7 @@ async def latest_publish_attempt(
         definition_id,
         user_id,
         lease_seconds,
+        max_age_seconds,
     )
     if row is None:
         return None
@@ -2994,6 +3012,7 @@ async def latest_publish_attempt(
         "state": row["state"],
         "verdict": verdict if isinstance(verdict, dict) else None,
         "tail_stranded": bool(row["tail_stranded"]),
+        "tail_expired": bool(row["tail_expired"]),
     }
 
 

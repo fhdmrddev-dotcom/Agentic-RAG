@@ -156,6 +156,7 @@ async def get_publish_attempt(
         definition_id=definition_id,
         user_id=user_id,
         lease_seconds=settings.harness_resume_lease_seconds,
+        max_age_seconds=settings.harness_publish_max_seconds,
     )
     if attempt is None:
         return PublishAttempt(state="none")
@@ -170,7 +171,10 @@ async def get_publish_attempt(
                 recover_publish_tail,
             )
 
-            recover_publish_tail(attempt["run_id"], pool=pool)
+            # WR-06: past the publish budget it records the timeout and is never judged.
+            recover_publish_tail(
+                attempt["run_id"], pool=pool, expired=bool(attempt.get("tail_expired"))
+            )
         except Exception:  # noqa: BLE001 — the golden sweep is the second net
             logger.exception("publish: could not recover the tail of %s", attempt["run_id"])
 

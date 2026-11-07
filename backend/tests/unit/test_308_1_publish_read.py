@@ -144,6 +144,7 @@ def test_a_running_attempt_reports_the_authored_step_its_position_and_the_run_st
         "definition_id": _DEF_ID,
         "user_id": UUID(_ME),
         "lease_seconds": settings.harness_resume_lease_seconds,  # 308.1 review CR-02
+        "max_age_seconds": settings.harness_publish_max_seconds,  # 308.1 review WR-06
     }
     assert get_def.await_args.kwargs["user_id"] == UUID(_ME)
 

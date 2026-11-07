@@ -239,16 +239,19 @@ def spawn_attempt(run_id, *, pool, redis) -> asyncio.Task:
     return _spawn(_attempt_task(run_id, pool=pool, redis=redis), name=f"publish-attempt-{run_id}")
 
 
-def recover_publish_tail(run_id, *, pool) -> asyncio.Task:
+def recover_publish_tail(run_id, *, pool, expired: bool = False) -> asyncio.Task:
     """Spawn a recovered tail (``finish_attempt_tail(recovered=True)``) for a stranded record.
 
     The ONE recovery entry, shared by the golden sweep's arm B and (308.1 review CR-02) the
     follow read, which notices a stranded tail while both workers stay up. Spawned, never
     awaited; the tail CAS decides the single winner, so a second spawn for the same run (two
-    polls, or a poll and the sweep) runs nothing."""
-    return _spawn(
-        finish_attempt_tail(run_id, pool=pool, recovered=True), name=f"publish-tail-{run_id}"
-    )
+    polls, or a poll and the sweep) runs nothing.
+
+    ``expired`` (308.1 review WR-06): the attempt is past the publish budget plus the lease. The
+    tail then records the existing ``golden_run_timeout`` verdict and never judges or flips
+    (a flip that already happened is still recognised by its receipt, Pitfall 7)."""
+    kwargs = {"recovered": True, "timed_out": True} if expired else {"recovered": True}
+    return _spawn(finish_attempt_tail(run_id, pool=pool, **kwargs), name=f"publish-tail-{run_id}")
 
 
 async def resume_stranded_golden_runs(*, pool, redis) -> int:
@@ -299,14 +302,16 @@ async def resume_stranded_golden_runs(*, pool, redis) -> int:
             logger.exception("publish: the golden sweep could not act on run %s", run_id)
 
     try:
-        tails = await find_stranded_publish_tails(pool, lease)
+        tails = await find_stranded_publish_tails(
+            pool, lease, max_age_seconds=settings.harness_publish_max_seconds
+        )
     except Exception:  # noqa: BLE001
         logger.exception("publish: the golden sweep could not list stranded publish tails")
         tails = []
     for row in tails:
         run_id = row["run_id"]
         logger.info("publish: finishing the stranded publish tail of golden run %s", run_id)
-        recover_publish_tail(run_id, pool=pool)
+        recover_publish_tail(run_id, pool=pool, expired=bool(row.get("expired")))
         acted += 1
     return acted
 
