@@ -458,6 +458,103 @@ async def test_a_shutdown_cancel_leaves_the_run_alone_and_runs_no_tail():
     env.finish_attempt.assert_not_awaited()
 
 
+async def _drain_background():
+    from app.services.harness import publish_attempt
+
+    for _ in range(3):  # a spawned tail may itself spawn nothing further; bounded anyway
+        tasks = [t for t in publish_attempt._BACKGROUND_TASKS if not t.done()]
+        if not tasks:
+            return
+        await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), 3)
+
+
+@contextlib.contextmanager
+def _recovery_reads(definition_status: str = "draft", receipts: dict | None = None):
+    """The two reads a recovered tail makes (``get_definition``, ``find_publish_receipt``)."""
+    receipts = receipts or {}
+
+    async def _receipt(pool, rid, event_type):
+        return receipts.get(event_type)
+
+    with (
+        patch("app.db.workflows.get_definition", AsyncMock(return_value={
+            "status": definition_status, "version": 1, "created_by": UUID(_USER["id"])})),
+        patch("app.db.workflows.find_publish_receipt", AsyncMock(side_effect=_receipt)) as found,
+    ):
+        yield found
+
+
+@pytest.mark.asyncio
+async def test_a_stop_on_the_golden_run_still_records_a_verdict_and_stays_cancelled():
+    """308.1 review CR-01: ``DELETE /runs/{golden_run_id}`` (the run page's Stop) cancels the
+    attempt task itself. That is NOT a shutdown, so the publish must still end with a recorded
+    verdict in the run's own words — never a record left ``running`` on a cancelled run (which
+    locked the draft out of publishing for the whole budget and polled the screen forever)."""
+    from app.services.harness import publish_attempt
+    from app.services.harness.run_handoff import golden_end_reason
+
+    run_id = uuid4()
+    started = asyncio.Event()
+
+    async def _drive():
+        started.set()
+        await asyncio.Event().wait()
+
+    with _Env(run_id, drive=_drive) as env, _recovery_reads():
+        task = asyncio.create_task(
+            publish_attempt._attempt_task(run_id, pool=AsyncMock(), redis=AsyncMock())
+        )
+        await asyncio.wait_for(started.wait(), 1)
+        env.attempt["status"] = "cancelled"  # the Stop wrote the row before it cancelled us
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task  # a cancelled task stays cancelled
+        await _drain_background()
+    env.claim.assert_awaited_once()
+    env.tail.assert_not_awaited()  # a stopped run's partial output is never judged
+    verdict = env.verdict_written()
+    assert verdict["blocked_stage"] == "golden_run_error"
+    assert verdict["named_failures"] == [
+        f"golden run could not complete: {golden_end_reason(None)}"
+    ]
+    assert verdict["golden_run_id"] == str(run_id)
+
+
+@pytest.mark.asyncio
+async def test_a_cancel_before_the_drive_started_ends_the_run_and_records_a_verdict():
+    """CR-01 / CR-02: cancelled while still building the ctx, the drive's own ``finally`` never
+    ran, so nothing else would end the row. It is ended with words and the publish recorded."""
+    from app.services.harness import publish_attempt
+
+    run_id = uuid4()
+    entered = asyncio.Event()
+
+    async def _slow_resolve(*a, **kw):
+        entered.set()
+        await asyncio.Event().wait()
+
+    with _Env(run_id) as env, _recovery_reads():
+        env.resolve.side_effect = _slow_resolve
+
+        async def _end(pool, rid, status, **kw):
+            env.attempt["status"] = status
+            return True
+
+        env.end_run.side_effect = _end
+        task = asyncio.create_task(
+            publish_attempt._attempt_task(run_id, pool=AsyncMock(), redis=AsyncMock())
+        )
+        await asyncio.wait_for(entered.wait(), 1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        await _drain_background()
+    env.run_workflow.assert_not_awaited()
+    env.end_run.assert_awaited_once()
+    assert env.end_run.await_args.args[1:] == (run_id, "failed")
+    assert env.verdict_written()["blocked_stage"] == "golden_run_error"
+
+
 @pytest.mark.asyncio
 async def test_drive_created_ends_the_run_on_a_cancel_that_is_not_a_shutdown():
     run_id = uuid4()
