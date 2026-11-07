@@ -264,6 +264,28 @@ describe("usePublishAttempt — following (D-19)", () => {
     expect(hook.result.current.phase).toBe("running")
   })
 
+  it("308.1 review IN-04 / D-20 — after a 202 for run-1, the server's run-2 is adopted whole: id, clock, verdict, onPublished (D-UI-08)", async () => {
+    // D-20's "the client checks golden_run_id equals the one it started" is answered by
+    // D-UI-08: a different id is the server's LATEST attempt (D-10: at most one in flight per
+    // draft), so it is followed exactly as a reopen would follow it, never ignored or mixed.
+    const run2Start = new Date(NOW - 30_000).toISOString()
+    const run2 = running({
+      golden_run_id: "run-2",
+      progress: { step_index: 1, step_count: 3, step_name: "Other tab's step", started_at: run2Start },
+    })
+    const { hook, read, onPublished } = await submitFromIdle(() => Promise.resolve(HANDLE), run2)
+    await flush()
+    expect(hook.result.current.goldenRunId).toBe("run-2")
+    expect(hook.result.current.attempt?.progress?.step_name).toBe("Other tab's step")
+    expect(hook.result.current.elapsedSec).toBe(30) // run-2's clock, not the click's
+    const pass2 = verdict({ published: true, version: 9, golden_run_id: "run-2", blocked_stage: null, named_failures: [] })
+    read.mockResolvedValue(done(pass2))
+    await flush(3_000)
+    expect(hook.result.current.phase).toBe("done")
+    expect(onPublished).toHaveBeenCalledTimes(1)
+    expect(onPublished).toHaveBeenCalledWith(9, [])
+  })
+
   it("a different golden_run_id from the server is adopted (D-UI-08)", async () => {
     const { hook, read } = setup(() => Promise.resolve(running()))
     await flush()
