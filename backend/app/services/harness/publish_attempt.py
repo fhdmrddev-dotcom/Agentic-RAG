@@ -38,11 +38,26 @@ weakly); it is never consulted to decide anything.
 re-raises at once: no tail claim, no verdict, and the drive's ``finally`` leaves the run row
 ``active`` (``publish_tail._drive_created``) so the next boot can re-drive it (Pitfall 9, 096-09).
 
-⛔ NEVER THROUGH THE GENERIC RESUME PATH. Golden runs stay excluded from the resume finder and from
-``_build_resume_context`` (D-12, the Phase 190 A4 fence). The golden sweep that re-drives a golden
-run stranded by a dead worker, closes one that cannot be finished, and re-tails a run whose tail
-never ran or whose ``finishing`` claim went stale, lands HERE in 308.1-03, and re-uses
-:func:`spawn_attempt` and :func:`finish_attempt_tail`.
+⛔ NEVER THROUGH THE GENERIC RESUME PATH. Golden runs stay excluded from the generic resume finder
+and from the engine's resume ctx builder (D-12, the Phase 190 A4 fence). The golden sweep
+(:func:`resume_stranded_golden_runs`, 308.1-03) has its own finders and re-uses
+:func:`spawn_attempt` and :func:`finish_attempt_tail`:
+
+* ``main.py`` calls it FIRST inside the existing boot and late resume passes, in its own
+  ``try`` (D-13). The late pass (lease + 30 s) is what catches the dead worker's OWN run: at
+  boot its heartbeat is still fresh, so ``claim_run`` refuses it.
+* arm A: every stranded ``active`` golden run is claimed with ``claim_run`` first. With no
+  publish record (a pre-308.1 orphan) it is closed ``failed`` with :data:`NO_RECORD_WORDS` and
+  one ``publish_blocked`` receipt; past ``harness_publish_max_seconds`` it is closed with the
+  timeout words and gets the ``golden_run_timeout`` verdict (D-14); otherwise it is re-driven
+  through :func:`spawn_attempt` and the ONE golden ctx (D-11, D-15). The killed step re-runs
+  from the top (``run_workflow`` skips completed steps). The sweep never awaits a re-drive.
+* arm B: a run that ENDED while its record still reads ``running``, or a ``finishing`` claim
+  older than the lease, gets a spawned ``finish_attempt_tail(recovered=True)`` (D-17). A
+  recovered tail reads ROWS: after a flip that already happened it records the success with the
+  ``publish_succeeded`` receipt's version (Pitfall 7, never a false ``already_published``); a
+  failed or cancelled run with no failed step gets ``golden_run_error`` with the run's own
+  recorded ``run_failed`` words (Pitfall 8, never a fabricated exception text).
 
 ⚠ PITFALL 13. ``config.py``'s comment that the background-job publish *stays deferred*, and the
 resume finder's docstring calling an abandoned golden run *correct*, are superseded by this module.
@@ -68,6 +83,13 @@ logger = logging.getLogger(__name__)
 #: event loop keeps only a weak reference to a task, so an unreferenced drive can be
 #: garbage-collected mid-run.
 _BACKGROUND_TASKS: set[asyncio.Task] = set()
+
+#: D-14: the words for a stranded golden run that has no publish record (a pre-308.1 orphan). It
+#: cannot be finished: nothing says what was being published or with which token.
+NO_RECORD_WORDS = (
+    "the golden run was interrupted by a server restart before it had a publish record, "
+    "so it could not be finished — publish again"
+)
 
 
 def _running_handle(run_id, state: str) -> dict:
@@ -203,14 +225,107 @@ async def begin_background_attempt(
     return _running_handle(run_id, "running")
 
 
-def spawn_attempt(run_id, *, pool, redis) -> asyncio.Task:
-    """Start :func:`_attempt_task` for ``run_id`` on this worker's loop, strongly referenced."""
-    task = asyncio.create_task(
-        _attempt_task(run_id, pool=pool, redis=redis), name=f"publish-attempt-{run_id}"
-    )
+def _spawn(coro, *, name: str) -> asyncio.Task:
+    """The ONE task spawner of this module: strongly referenced until it finishes."""
+    task = asyncio.create_task(coro, name=name)
     _BACKGROUND_TASKS.add(task)
     task.add_done_callback(_BACKGROUND_TASKS.discard)
     return task
+
+
+def spawn_attempt(run_id, *, pool, redis) -> asyncio.Task:
+    """Start :func:`_attempt_task` for ``run_id`` on this worker's loop, strongly referenced."""
+    return _spawn(_attempt_task(run_id, pool=pool, redis=redis), name=f"publish-attempt-{run_id}")
+
+
+async def resume_stranded_golden_runs(*, pool, redis) -> int:
+    """The golden sweep (D-11..D-14, D-17): act on golden runs and tails a dead worker left.
+
+    Arm A claims every stranded ``active`` golden run with ``claim_run`` (the generic sweep's CAS,
+    so two workers never act on the same run) and then closes it with words or re-drives it. Arm B
+    spawns a recovered tail for each ended run whose publish tail never finished; the tail CAS
+    decides the single winner. Re-drives and recovered tails are SPAWNED, never awaited, so the
+    generic resume that follows is never held up. One run's failure never stops the sweep.
+    Returns the number of runs acted on.
+    """
+    from datetime import datetime, timezone  # noqa: PLC0415
+
+    from app.config import settings  # noqa: PLC0415
+    from app.db.workflows import (  # noqa: PLC0415
+        claim_run,
+        find_stranded_golden_runs,
+        find_stranded_publish_tails,
+    )
+
+    lease = settings.harness_resume_lease_seconds
+    acted = 0
+    try:
+        stranded = await find_stranded_golden_runs(pool, lease)
+    except Exception:  # noqa: BLE001 — arm B still runs
+        logger.exception("publish: the golden sweep could not list stranded golden runs")
+        stranded = []
+    for row in stranded:
+        run_id = row["run_id"]
+        try:
+            if not await claim_run(pool, run_id, lease):
+                continue  # another worker owns it, or its producer is still beating
+            acted += 1
+            if not row.get("has_publish"):
+                await _close_orphan(pool, row)
+                continue
+            age = (datetime.now(timezone.utc) - row["created_at"]).total_seconds()
+            if age >= settings.harness_publish_max_seconds:
+                await _end_undriven(
+                    pool, run_id, user_id=row.get("user_id"), escape=asyncio.TimeoutError()
+                )
+                await finish_attempt_tail(run_id, pool=pool, timed_out=True)
+                continue
+            logger.info("publish: re-driving stranded golden run %s (pid %s)", run_id, os.getpid())
+            spawn_attempt(run_id, pool=pool, redis=redis)
+        except Exception:  # noqa: BLE001 — the next run still gets its turn
+            logger.exception("publish: the golden sweep could not act on run %s", run_id)
+
+    try:
+        tails = await find_stranded_publish_tails(pool, lease)
+    except Exception:  # noqa: BLE001
+        logger.exception("publish: the golden sweep could not list stranded publish tails")
+        tails = []
+    for row in tails:
+        run_id = row["run_id"]
+        logger.info("publish: finishing the stranded publish tail of golden run %s", run_id)
+        _spawn(
+            finish_attempt_tail(run_id, pool=pool, recovered=True), name=f"publish-tail-{run_id}"
+        )
+        acted += 1
+    return acted
+
+
+async def _close_orphan(pool, row) -> None:
+    """D-14: a stranded golden run with no publish record is ended ``failed`` with words, and the
+    winner of that end writes ONE ``publish_blocked`` receipt naming the run."""
+    from app.services.harness import publish_service as _ps  # noqa: PLC0415
+    from app.services.harness.run_handoff import end_run  # noqa: PLC0415
+
+    run_id = row["run_id"]
+    won = await end_run(
+        pool,
+        run_id,
+        "failed",
+        user_id=row.get("user_id"),
+        reason=NO_RECORD_WORDS,
+        fail_active_phase=True,
+    )
+    if not won:
+        return  # another writer ended it first; it owns the record of why
+    await _ps._block(
+        pool,
+        run_id=run_id,
+        user_id=row.get("user_id"),
+        definition_id=row.get("definition_id"),
+        stage="golden_run_error",
+        named_failures=[NO_RECORD_WORDS],
+        golden_run_id=run_id,
+    )
 
 
 async def _attempt_task(run_id, *, pool, redis) -> None:
@@ -309,7 +424,12 @@ async def _attempt_task(run_id, *, pool, redis) -> None:
 
 
 async def finish_attempt_tail(
-    run_id, *, pool, drive_error: BaseException | None = None, timed_out: bool = False
+    run_id,
+    *,
+    pool,
+    drive_error: BaseException | None = None,
+    timed_out: bool = False,
+    recovered: bool = False,
 ) -> dict | None:
     """Claim the publish tail of a golden run that has ended; run it and record the verdict.
 
@@ -325,6 +445,10 @@ async def finish_attempt_tail(
     If the tail itself raises after the claim, the record stays ``finishing``; once that claim is
     older than ``harness_resume_lease_seconds`` it is claimable again (the sweep's recovery arm).
     Returns the verdict, or ``None`` when nothing was recorded here.
+
+    ``recovered=True`` is the sweep's arm B (308.1-03): no drive state exists, so
+    :func:`_recovered_verdict` first answers the two cases rows alone can settle (Pitfall 7 and 8);
+    anything else runs the ordinary tail from the rows.
     """
     from fastapi.encoders import jsonable_encoder  # noqa: PLC0415
 
@@ -349,7 +473,16 @@ async def finish_attempt_tail(
         definition_id = UUID(str(record.get("definition_id") or attempt["definition_id"]))
         user_id = UUID(str(record.get("requested_by") or attempt["user_id"]))
         definition = WorkflowDefinition.model_validate(attempt["definition_snapshot"])
-        if timed_out:
+        verdict = (
+            await _recovered_verdict(
+                pool, run_id, attempt=attempt, definition_id=definition_id, user_id=user_id
+            )
+            if recovered
+            else None
+        )
+        if verdict is not None:
+            pass  # a recovered tail settled by the rows alone (Pitfall 7 / Pitfall 8)
+        elif timed_out:
             verdict = await _ps._block(
                 pool,
                 run_id=run_id,
@@ -399,3 +532,66 @@ async def finish_attempt_tail(
 
     await finish_publish_attempt(pool, run_id, jsonable_encoder(verdict))
     return verdict
+
+
+async def _recovered_verdict(pool, run_id, *, attempt, definition_id, user_id) -> dict | None:
+    """What a recovered tail can conclude from ROWS alone, or ``None`` for the ordinary tail.
+
+    Pitfall 7 / T-308.1-15: the draft is already ``published`` AND this run's own
+    ``publish_succeeded`` receipt exists, so the dead worker flipped it and died before recording
+    ``done``. The success is recorded with the receipt's version (the row's when the receipt has
+    none). Re-running the tail would flip again, get -1 and record a FALSE ``already_published``.
+    Without this run's receipt the ordinary tail runs, and its ``already_published`` is then true.
+
+    Pitfall 8: the run ended ``failed`` or ``cancelled`` with no ``failed`` step, so there is no
+    structural cause and no exception object. The verdict is ``golden_run_error`` carrying the
+    run's own recorded ``run_failed`` words (the generic golden words when none was recorded),
+    never a fabricated exception text; the time-limit words map to ``golden_run_timeout``. A run
+    with a ``failed`` step returns ``None``: the ordinary tail takes the structural-gate path.
+    """
+    from app.config import settings  # noqa: PLC0415
+    from app.db.workflows import (  # noqa: PLC0415
+        find_publish_receipt,
+        get_definition,
+        load_run_phases,
+    )
+    from app.services.harness import publish_service as _ps  # noqa: PLC0415
+    from app.services.harness.run_handoff import golden_end_reason  # noqa: PLC0415
+
+    row = await get_definition(pool, definition_id, user_id=user_id)
+    if row is not None and row.get("status") == "published":
+        receipt = await find_publish_receipt(pool, run_id, "publish_succeeded")
+        if receipt is not None:
+            version = receipt.get("version")
+            if not isinstance(version, int) or version < 0:
+                version = row.get("version")
+            logger.info("publish: golden run %s had already published v%s", run_id, version)
+            return {"published": True, "version": version, "golden_run_id": run_id}
+
+    if attempt.get("status") not in ("failed", "cancelled"):
+        return None
+    phases = await load_run_phases(pool, run_id)
+    if any(p.get("status") == "failed" for p in phases):
+        return None
+    receipt = await find_publish_receipt(pool, run_id, "run_failed")
+    reason = (receipt or {}).get("reason")
+    reason = reason.strip() if isinstance(reason, str) and reason.strip() else golden_end_reason(None)
+    if reason == golden_end_reason(asyncio.TimeoutError()):
+        return await _ps._block(
+            pool,
+            run_id=run_id,
+            user_id=user_id,
+            definition_id=definition_id,
+            stage="golden_run_timeout",
+            named_failures=[_budget_words(settings.harness_publish_max_seconds)],
+            golden_run_id=run_id,
+        )
+    return await _ps._block(
+        pool,
+        run_id=run_id,
+        user_id=user_id,
+        definition_id=definition_id,
+        stage="golden_run_error",
+        named_failures=[f"golden run could not complete: {reason}"],
+        golden_run_id=run_id,
+    )

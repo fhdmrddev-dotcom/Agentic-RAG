@@ -2867,6 +2867,130 @@ async def finish_publish_attempt(pool: asyncpg.Pool, run_id: UUID, verdict: dict
     return row is not None
 
 
+# 308.1-03 — the golden sweep's two finders and the follow read's two reads. The generic
+# resume finder above stays byte-unchanged (D-12): these are separate statements, so a golden
+# run reaches a re-drive only through the golden sweep and its ONE golden ctx builder.
+
+
+async def find_stranded_golden_runs(pool: asyncpg.Pool, lease_seconds: int) -> list[dict]:
+    """``active`` golden runs whose producer heartbeat is older than the lease (D-11 / D-14).
+
+    ``updated_at`` is the heartbeat (``touch_run_liveness``); older than ``lease_seconds`` means
+    nobody is driving the run. Unlike the generic resume finder there is NO active-step
+    requirement: a worker can die BETWEEN steps (the previous step ``completed``, the next one
+    still ``pending``). Returns ``run_id, definition_id, user_id, created_at, has_publish``;
+    ``has_publish`` is False for a pre-308.1 orphan with no record object (a jsonb string scalar
+    is not a record either). A row here is only a CANDIDATE: the sweep claims it with
+    :func:`claim_run` before acting.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS). The sweep acts
+    on every user's rows by design; nothing here is ever returned to a client. ``$N`` only.
+    """
+    rows = await pool.fetch(
+        "SELECT id AS run_id, definition_id, user_id, created_at,"
+        " COALESCE(jsonb_typeof(metadata->'publish') = 'object', false) AS has_publish "
+        "FROM workflow_runs "
+        "WHERE status = 'active' AND is_golden_run = true "
+        "  AND updated_at < now() - make_interval(secs => $1) "
+        "ORDER BY created_at",
+        lease_seconds,
+    )
+    return [dict(r) for r in rows]
+
+
+async def find_stranded_publish_tails(pool: asyncpg.Pool, lease_seconds: int) -> list[dict]:
+    """Ended golden runs whose publish tail never finished (D-17 recovery).
+
+    Two shapes: the record still reads ``running`` on a run that is ``completed`` / ``failed`` /
+    ``cancelled`` (its worker died before claiming the tail), or it reads ``finishing`` with a
+    ``finishing_at`` older than the lease (its worker died mid-tail). Never a ``done`` record,
+    never an ``active`` run, never a non-golden row, never a string scalar.
+
+    ⚠ A TERMINAL RUN NEEDS NO STALENESS CHECK, and adding one would hide exactly the run this
+    exists for: the periodic reconciler (``run_reconciler._reconcile_workflow_runs``) finalises a
+    dead golden run whose steps all ended and writes a FRESH ``updated_at`` while doing it. The
+    tail CAS (:func:`claim_publish_tail`) decides the single winner if a live worker is racing.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS); nothing here
+    reaches a client. ``$N`` only.
+    """
+    rows = await pool.fetch(
+        """
+        SELECT id AS run_id, status, metadata->'publish'->>'state' AS state
+        FROM workflow_runs
+        WHERE is_golden_run = true
+          AND status IN ('completed', 'failed', 'cancelled')
+          AND jsonb_typeof(metadata->'publish') = 'object'
+          AND (   metadata->'publish'->>'state' = 'running'
+               OR (    metadata->'publish'->>'state' = 'finishing'
+                   AND (metadata->'publish'->>'finishing_at')::timestamptz
+                       < now() - make_interval(secs => $1)))
+        ORDER BY created_at
+        """,
+        lease_seconds,
+    )
+    return [dict(r) for r in rows]
+
+
+async def latest_publish_attempt(
+    pool: asyncpg.Pool, *, definition_id: UUID, user_id: UUID
+) -> dict | None:
+    """The caller's newest publish attempt on a draft, for ``GET /workflows/{id}/publish`` (D-20).
+
+    Returns ``run_id, status, created_at, definition_snapshot (dict | None), state, verdict``, or
+    ``None``. Only the record's ``state`` and ``verdict`` leave this function: the record's
+    ``golden_input`` and ``stage0_token`` are never selected, so no caller can leak them.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS): it filters on
+    the caller's own ``user_id`` (another user's attempt never matches); ownership of the draft is
+    the CALLER's (T-147-06 / T-308.1-13). ``$N`` only.
+    """
+    row = await pool.fetchrow(
+        "SELECT id, status, created_at, definition_snapshot,"
+        " metadata->'publish'->>'state' AS state, metadata->'publish'->'verdict' AS verdict "
+        "FROM workflow_runs "
+        "WHERE definition_id = $1 AND user_id = $2 AND is_golden_run = true "
+        "  AND jsonb_typeof(metadata->'publish') = 'object' "
+        "ORDER BY created_at DESC LIMIT 1",
+        definition_id,
+        user_id,
+    )
+    if row is None:
+        return None
+    snapshot = _decode_jsonb(row["definition_snapshot"])
+    verdict = row["verdict"]
+    return {
+        "run_id": row["id"],
+        "status": row["status"],
+        "created_at": row["created_at"],
+        "definition_snapshot": snapshot if isinstance(snapshot, dict) else None,
+        "state": row["state"],
+        "verdict": verdict if isinstance(verdict, dict) else None,
+    }
+
+
+async def find_publish_receipt(pool: asyncpg.Pool, run_id: UUID, event_type: str) -> dict | None:
+    """The newest ``harness_audit`` metadata of ``event_type`` for ``run_id``, as a dict, or None.
+
+    ``write_audit`` binds ``json.dumps(metadata)`` through the jsonb codec, so the stored value is
+    a jsonb STRING scalar holding the object; it is decoded here until it is a dict.
+
+    ⚠ THE ``WHERE`` CLAUSE IS THE ACCESS BOUNDARY (service-role pool, BYPASSRLS); it takes a key
+    only, ownership is the CALLER's (T-147-06). ``$N`` only.
+    """
+    raw = await pool.fetchval(
+        "SELECT metadata FROM harness_audit WHERE run_id = $1 AND event_type = $2 "
+        "ORDER BY created_at DESC LIMIT 1",
+        run_id,
+        event_type,
+    )
+    for _ in range(3):
+        if isinstance(raw, dict) or raw is None:
+            break
+        raw = _decode_jsonb(raw)
+    return raw if isinstance(raw, dict) else None
+
+
 # ── harness_audit (this table's own column IS run_id — correct) ──────────────
 async def write_audit(
     pool: asyncpg.Pool,

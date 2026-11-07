@@ -486,16 +486,17 @@ def test_the_golden_sweep_runs_first_in_both_resume_passes_in_its_own_try(pass_n
     assert golden != -1 and generic != -1, src
     assert golden < generic, "the golden sweep must run BEFORE the generic resume"
     # Its own try/except: a golden-sweep exception is logged and the generic resume still runs.
+    def _body_calls(t):
+        return _call_names(ast.Module(body=t.body, type_ignores=[]))
+
     own_try = [
         t for t in ast.walk(fn)
         if isinstance(t, ast.Try)
-        and "resume_stranded_golden_runs" in _call_names(ast.Module(body=t.body, type_ignores=[]))
+        and "resume_stranded_golden_runs" in _body_calls(t)
+        and "resume_stranded_workflows" not in _body_calls(t)  # the generic call is OUTSIDE it
     ]
     assert len(own_try) == 1
     inner = own_try[0]
-    assert "resume_stranded_workflows" not in _call_names(
-        ast.Module(body=inner.body, type_ignores=[])
-    )
     assert any(
         isinstance(h.type, ast.Name) and h.type.id == "Exception" for h in inner.handlers
     )

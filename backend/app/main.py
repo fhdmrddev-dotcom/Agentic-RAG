@@ -406,6 +406,14 @@ async def lifespan(app_instance):
     # a slow resume never blocks startup; best-effort (logs + continues on error).
     async def _resume_stranded():
         try:
+            try:  # 308.1-03 (D-13): the golden sweep FIRST, in its own try; it never awaits a re-drive
+                from app.dependencies import get_redis
+                from app.services.harness.publish_attempt import resume_stranded_golden_runs
+                golden = await resume_stranded_golden_runs(pool=await get_pg_pool(), redis=get_redis())
+                if golden:
+                    logger.info("Golden publish sweep acted on %d run(s)", golden)
+            except Exception:
+                logger.exception("Golden publish sweep failed (app continues)")
             from app.services.harness_engine import resume_stranded_workflows
             from app.dependencies import get_redis
             count = await resume_stranded_workflows(
@@ -428,6 +436,14 @@ async def lifespan(app_instance):
     async def _resume_stranded_late():
         await asyncio.sleep(settings.harness_resume_lease_seconds + 30)
         try:
+            try:  # 308.1-03 (D-13): the late pass is what catches a dead worker's own golden run
+                from app.dependencies import get_redis
+                from app.services.harness.publish_attempt import resume_stranded_golden_runs
+                golden = await resume_stranded_golden_runs(pool=await get_pg_pool(), redis=get_redis())
+                if golden:
+                    logger.info("Golden publish late sweep acted on %d run(s)", golden)
+            except Exception:
+                logger.exception("Golden publish sweep failed (app continues)")
             from app.services.harness_engine import resume_stranded_workflows
             from app.dependencies import get_redis
             count = await resume_stranded_workflows(
