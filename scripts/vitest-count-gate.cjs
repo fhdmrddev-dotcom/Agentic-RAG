@@ -675,7 +675,7 @@ const BASELINE = {
   // began (the file ran 78 at wave 1's start), so it was leaving 37 cases deletable in
   // silence on the gauntlet — the publish surface. Reasons + the full six-pin table live in
   // the 214.1-02 block beside `declaredInputs.test.ts`.
-  "PublishGauntlet.test.tsx": 91, // 288-04: 83 -> 91 (288-02 auto_answered block + pause stage copy; read from the gate's own actual column)
+  "PublishGauntlet.test.tsx": 106, // 308.1-04: 91 -> 106 (P1-P13 the followed publish screen + the source fence; F18 now reads publish_tail.py + publish_attempt.py) · 288-04: 83 -> 91 (288-02 auto_answered block + pause stage copy; read from the gate's own actual column)
   "WorkflowBuilderPage.canvas.test.tsx": 154, // 288-04: 128 -> 154 (the retired TWO-children pin rewritten to THREE; gate actual)
   // ⚠ 193.1-08 (D-24): 19 → 30 (+11). Read from THIS SCRIPT'S OWN `actual` column
   // (`WorkflowBuilderPage.describe.test.tsx 19 30 +11`), never counted by hand.
@@ -4463,7 +4463,7 @@ const BASELINE = {
   "OrgProvider.test.tsx": 8, // 298-01 ADOPTED (6 Phase 166 cases) + 2: the WR-01 self-heal syncs the header before a child effect sees the adopted org (D-36); useActiveOrgId null outside / org inside
   // ── Phase 298-02 (ORG-05 / D-36 / D-12) — both knobs, same commit (2026-10-28). api.workflows.test.ts
   //    was in NEITHER knob before this (no src/lib directory entry), so it is ADOPTED at 24 existing + 6 new = 30.
-  "api.workflows.test.ts": 30, // 298-02 ADOPTED: coded 422 -> WorkflowFolderRefusedError on create + update, other 422 unchanged, allOrgs omits X-Org-Id
+  "api.workflows.test.ts": 36, // RAISED 30 -> 36 at 308.1-04: the 202 handle (3) + getPublishAttempt (3) · 298-02 ADOPTED: coded 422 -> WorkflowFolderRefusedError on create + update, other 422 unchanged, allOrgs omits X-Org-Id
   "threads.folderRefusal.test.ts": 3, // 298-02 — postMessage keeps detail.message (and code) from an object detail; string detail and array fallback unchanged
   // ── Phase 298-04 (ORG-01..04 / D-08..D-12) — both knobs, same commit (2026-10-28). useFolders.test.ts
   //    and FolderTree.test.tsx were in NEITHER knob before this (no src/__tests__/hooks or
@@ -4575,6 +4575,10 @@ const BASELINE = {
   "AuditTab.webhookWords.test.tsx": 3, // 308-06 — nine webhook.endpoint.* sentences + host as text, 253 cap, the Webhooks filter group
   "OrgAuditTab.webhookWords.test.tsx": 3, // 308-06 — the same nine words + host in the org browser, its filter group, lockstep with AuditTab
   "webhookWaitingRow.test.tsx": 9, // 308-06 — run arm byte-equal, webhook arm → openWebhooks, no-op without the door, words, neutral count, zero-import leaf, mixed list, ChatLayout door
+  // 308.1-04: FIRST pins for the publish-follow hook and its copy leaf (pin only — both sit under the
+  // "src/components/workflows" TARGETS directory entry). Counts from the gate's own actual column.
+  "usePublishAttempt.test.ts": 27, // 308.1-04 — opening/idle/submitting/running/finishing/done/lost, 3000 ms follow, stale guard, follow error after 2, 404 lost, server clock, onPublished once per run, reset
+  "publishFollowVocabulary.test.ts": 11, // 308.1-04 — zero imports, U+2014 only, no '!', C-07 has no failure word, C-01..C-10 verbatim, four bold spans
 }
 
 // Still COMPUTED, never hand-written — the reduce is the single source, so the

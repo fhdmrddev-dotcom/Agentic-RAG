@@ -159,8 +159,8 @@ export function usePublishAttempt({
     if (id !== currentAttemptRef.current) return
     failuresRef.current = 0
     setFollowError(false)
-    if (a.state === "running" || a.state === "finishing") follow(a)
-    else if (a.state === "done" && a.verdict) settle(outcomeOfVerdict(a.verdict))
+    if (a?.state === "running" || a?.state === "finishing") follow(a)
+    else if (a?.state === "done" && a.verdict) settle(outcomeOfVerdict(a.verdict))
     else {
       setAttempt(null)
       setPhase("lost")
@@ -187,11 +187,18 @@ export function usePublishAttempt({
     const id = ++currentAttemptRef.current
     failuresRef.current = 0
     if (!open) return
-    readRef.current(definitionId).then(
+    // A client that throws synchronously is a failed read, never a crashed effect.
+    let pending: Promise<PublishAttempt>
+    try {
+      pending = readRef.current(definitionId)
+    } catch (e) {
+      pending = Promise.reject(e)
+    }
+    pending.then(
       (a) => {
         if (id !== currentAttemptRef.current) return
-        if (a.state === "running" || a.state === "finishing") follow(a)
-        else if (a.state === "done" && a.verdict) settle(outcomeOfVerdict(a.verdict))
+        if (a?.state === "running" || a?.state === "finishing") follow(a)
+        else if (a?.state === "done" && a.verdict) settle(outcomeOfVerdict(a.verdict))
         else setPhase("idle")
       },
       () => {
@@ -247,7 +254,7 @@ export function usePublishAttempt({
         try {
           const a = await readRef.current(definitionId)
           if (readId !== currentAttemptRef.current) return
-          if (a.state === "running" || a.state === "finishing") {
+          if (a?.state === "running" || a?.state === "finishing") {
             follow(a)
             return
           }

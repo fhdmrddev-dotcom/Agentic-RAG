@@ -119,6 +119,9 @@ vi.mock("@/lib/api", () => ({
   generateWorkflow: mockGenerate,
   updateWorkflowDraft: mockUpdate,
   publishWorkflow: mockPublish,
+  // 308.1-04: opening the publish modal now asks where this draft's publish is; "none" keeps
+  // the resting form every case here drives. Declared because a case here OPENS the modal.
+  getPublishAttempt: () => Promise.resolve({ state: "none", golden_run_id: null, verdict: null, progress: null }),
   listFolders: mockListFolders,
   listSkills: mockListSkills,
   listStarterWorkflows: mockListStarters,

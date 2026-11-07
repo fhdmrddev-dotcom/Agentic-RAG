@@ -489,7 +489,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/WaitingOnLine.tsx` | 1 / 1 / 26 | young (created 288-03) · leaf, no hook · ⛔ |
 | `frontend/src/components/chat/OutputFileCard.tsx` | 9 / 8 / 187 (was `8 / 7 / 219`) | honoured by construction (302-01: download moved to useSandboxDownload) |
 | `frontend/src/components/panel/FilesSection.tsx` | 14 / 9 / 366 (was `12 / 8 / 354`) | 302-01: one GeneratedFilesGroup mount; workspace rows byte-identical |
-| `frontend/src/lib/api.ts` | 215 / 128 / 556 (was `214 / 127 / 552`) | 299-03: one links export block |
+| `frontend/src/lib/api.ts` | 216 / 129 / 561 (was `215 / 128 / 556`) | 308.1-04: getPublishAttempt + PublishAttempt/PublishProgress beside siblings |
 | `frontend/src/types/index.ts` | 104 / 83 / 1690 (was `103 / 82 / 1688`) | 306-04: RunOrigin.kind + mcp; Thread.origin (types only) · seam OWED |
 | `backend/app/main.py` | 101 / 75 / 1056 (was `100 / 74 / 1024`) | 308-04: routers + WebhookDrainer lifespan (D-50); httpx log WARNING · ⛔ |
 | `backend/app/config.py` | 96 / 55 / 1831 (was `93 / 54 / 1809`) | 300-03: SMTP_* fields (D-28) · seam OWED · ⛔ |
@@ -498,7 +498,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/multimodal_service.py` | 14 / 7 / 984 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `backend/app/api/documents.py` | 101 / 40 / 2709 (was `99 / 39 / 2698`) | 298-01: one by_org in build() + one root_upload_org kwarg · ⛔ |
 | `backend/app/api/library.py` | 3 / 3 / 304 (was `2 / 2 / 299`) | ⚠ now FIRES (298) · 298-01: summary shares the lists' org predicate ($1) |
-| `scripts/vitest-count-gate.cjs` | 419 / 90 / 7022 (was `417 / 89 / 6986`) | 308-05 + 308-06: 14 first pins (both knobs, file-level); none lowered |
+| `scripts/vitest-count-gate.cjs` | 420 / 91 / 7026 (was `419 / 90 / 7022`) | 308.1-04: 2 first pins + 2 raised (PublishGauntlet, api.workflows) |
 | `scripts/check-deploy-drift.sh` | 6 / 5 / 271 (was `5 / 4 / 267`) | 300-03: SMTP_* parity |
 | `scripts/build-public-openapi.cjs` | 14 / 8 / 475 (was `13 / 7 / 473`) | 308-04: webhooks tag + /webhooks, /org/webhooks FLAGGED (D-52) |
 | `scripts/check-seeds-register.cjs` | 7 / 3 / 1132 | ⚠ FIRES, absent here — row added 296-05 · `\d{3,}` ids · ⛔ |
@@ -524,7 +524,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/run_read_wire.py` | 3 / 3 / 183 (was `2 / 2 / 183`) | ⚠ now FIRES (306) · 306-04: mcp in ORIGIN_KINDS + RunOriginWire · ⛔ |
 | `frontend/src/components/admin/ModelRegistryTab.tsx` | 19 / 7 / 1705 (was `17 / 7 / 1679`) | honoured by construction (282-04: Add-form Timeout) · AddModelForm seam OWED · ⛔ |
 | `frontend/src/components/workflows/soulData.ts` | 15 / 13 / 556 (was `14 / 12 / 554`) | 296-07: blank label falls back to the key (287-IN-02) |
-| `frontend/src/components/workflows/PublishGauntlet.tsx` | 22 / 12 / 1390 (was `21 / 11 / 1385`) | 296-07: onPublished carries the auto_answered notes (one arg) |
+| `frontend/src/components/workflows/PublishGauntlet.tsx` | 23 / 13 / 1487 (was `22 / 12 / 1390`) | 308.1-04: follow logic moved to usePublishAttempt; hero follows; live link · ⛔ |
 | `frontend/src/landing/facts.ts` | 9 / 5 / 546 (was `8 / 4 / 546`) | 308-05: Webhooks appended to SURFACE_TABS.settings (data only) |
 | `frontend/src/components/workflows/PhaseSpineGraph.tsx` | 8 / 6 / 723 (was `5 / 5 / 473`) | 290: forecast unused — chips went on the library card, not here |
 | `frontend/src/components/workflows/doorVocabulary.ts` | 6 / 4 / 540 | no seam proposed |
@@ -566,7 +566,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/nodePresentation.ts` | 8 / 7 / 221 | ⚠ absent from BOTH for its ENTIRE LIFE at **7 phases** |
 | `frontend/src/lib/api/threads.ts` | 25 / 15 / 2006 (was `24 / 14 / 1994`) | 298-02: postMessage reads detail.message + code (object detail) · ⛔ |
 | `frontend/src/lib/api/connectors.ts` | 17 / 11 / 740 | honoured by construction (244-06) · ⛔ |
-| `frontend/src/lib/api/workflows.ts` | 17 / 16 / 1395 (was `16 / 16 / 1364`) | 299-04: run org_id; ?from_definition_id=; WorkflowOrgRefusedError on the 409 |
+| `frontend/src/lib/api/workflows.ts` | 18 / 17 / 1421 (was `17 / 16 / 1395`) | 308.1-04: publishWorkflow 202 → running; getPublishAttempt (GET) |
 | `frontend/src/lib/connectionMark.tsx` | 7 / 4 / 313 | ✅ **the move IS the seam, and it was TAKEN (214-08)** |
 | `frontend/src/components/ingestion/DocumentList.tsx` | 31 / 15 / 372 (was `31 / 16 / 372`) | last touch 275-02/04 |
 | `frontend/src/pages/LibraryPage.tsx` | 71 / 22 / 1349 (was `70 / 21 / 1347`) | 305-02: one DocumentCantBeOpened mount in the S8 slot (+ import) · ⛔ |
@@ -691,7 +691,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `frontend/src/components/workflows/TemplateAttachSection.tsx` | 6 / 3 / 450 (was `5 / 3 / 411`) | ⚠ now FIRES (296) · 296-07: labels, PDF Replace, bind split |
 | `frontend/src/components/workflows/GovernanceSection.tsx` | 6 / 3 / 455 | ⚠ absent its entire life — row added 296-07 (D-26) · seal detected-only |
 | `frontend/src/components/workflows/NodeCornerMarks.tsx` | 5 / 3 / 305 | ⚠ absent its entire life — row added 296-07 (D-26) · unmodified |
-| `frontend/src/lib/api/knowledge.ts` | 10 / 8 / 915 (was `8 / 7 / 910`) | 296-07: covered_by may be null (types only) · ⛔ |
+| `frontend/src/lib/api/knowledge.ts` | 11 / 9 / 944 (was `10 / 8 / 915`) | 308.1-04: PublishVerdict.state; running outcome; PublishAttempt (types) · ⛔ |
 | `backend/app/services/google_service.py` | 12 / 8 / 661 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE builder · ⛔ |
 | `backend/app/services/provider_gateway/anthropic.py` | 5 / 5 / 125 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |
 | `backend/app/services/provider_gateway/google.py` | 4 / 4 / 107 | ⚠ absent its ENTIRE LIFE — row added 282 · 282-01: ONE kwarg · ⛔ |

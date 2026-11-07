@@ -40,6 +40,8 @@ The golden run is a real run, not a simulation: it reads your documents, runs ev
 
 If the golden run times out or fails, the publish stops at that stage and the workflow stays a draft.
 
+You can close the publish window while the golden run is going; it keeps running, and opening Publish again shows where it is or what the judge decided.
+
 ## The judge
 
 The judge is a separate model that grades the golden run's deliverable against the business requirement you declared. A deliverable that is well-formed but does not meet the requirement fails here. An operator chooses which model acts as judge.

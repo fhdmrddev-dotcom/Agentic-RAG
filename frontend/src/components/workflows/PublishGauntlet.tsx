@@ -38,9 +38,26 @@
  * The run link gates strictly on `golden_run_id != null` (stage 3+ reached);
  * otherwise an explicit no-run note. Lint codes render the LOWERCASE literals.
  */
-import { useEffect, useId, useRef, useState } from "react"
+import { Fragment, useEffect, useId, useRef, useState } from "react"
 import type { ComponentType, SVGProps } from "react"
-import { publishWorkflow, type PublishOutcome, type PublishVerdict } from "@/lib/api"
+import {
+  getPublishAttempt,
+  publishWorkflow,
+  type PublishAttempt,
+  type PublishOutcome,
+  type PublishVerdict,
+} from "@/lib/api"
+// Phase 308.1-04 (BUG-261107-01, D-03) — the request/follow logic lives in ONE hook. The
+// golden run now runs on the server: the POST answers 202 with a handle, and the hook follows
+// it with `GET /workflows/{id}/publish` until a verdict, and picks it up again on a reopen.
+// `publishWorkflow` and `getPublishAttempt` are INJECTED into it from here.
+import { usePublishAttempt, type UsePublishAttempt } from "@/components/workflows/usePublishAttempt"
+import {
+  PUBLISH_FOLLOW_COPY,
+  PUBLISH_PROGRESS,
+  PUBLISH_PROGRESS_UNNAMED,
+} from "@/components/workflows/publishFollowVocabulary"
+import { nodeTitle, type PhaseSpecJSON } from "@/components/workflows/phaseVocabulary"
 // Phase 124-03 Task 2 (WUX-01, D-06, sketch 046-A ③) — the publish-summary soul
 // block. PREPEND ONLY: <WorkflowSoul scale="pub"> sits ABOVE the existing 8-stage
 // gauntlet ladder + verdict, which stay byte-behavior-identical (the ladder re-skin
@@ -252,6 +269,9 @@ function httpStatusForKind(kind: PublishOutcome["kind"]): number {
   switch (kind) {
     case "verdict":
       return 200
+    // 308.1 (D-08): the handle. Never rendered as an outcome — the hook follows it instead.
+    case "running":
+      return 202
     case "business_requirement":
       return 400
     case "not_found":
@@ -638,7 +658,22 @@ function GauntletSpine({ blockedStage, running }: { blockedStage: string | null;
  * the chip is OMITTED entirely (honestly-absent), never a fabricated engine
  * (T-127-06).
  */
-function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provider?: string }) {
+function PublishingNotice({
+  elapsedSec,
+  provider,
+  heading = PUBLISH_FOLLOW_COPY.headingRunning,
+  progress,
+  followError = false,
+}: {
+  elapsedSec: number
+  provider?: string
+  /** 308.1-04 (D-UI-04): C-02 while the run goes, C-03 while its result is reviewed. */
+  heading?: string
+  /** 308.1-04 (D-22): the ONE progress line while following, in the author's words. */
+  progress?: string | null
+  /** 308.1-04 (D-UI-06): two reads in a row did not answer. Muted — the run is not failing. */
+  followError?: boolean
+}) {
   const mm = Math.floor(elapsedSec / 60)
   const ss = elapsedSec % 60
   const clock = mm > 0 ? `${mm}m ${String(ss).padStart(2, "0")}s` : `${ss}s`
@@ -659,12 +694,22 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
           >
             <Rocket className="h-5 w-5" />
           </span>
-          Running the golden run on your KB…
+          {heading}
         </div>
         <span data-testid="publish-elapsed" className="flex-none font-mono text-[13px] font-bold tabular-nums text-amber-600 dark:text-amber-400">
           {clock} elapsed
         </span>
       </div>
+      {progress && (
+        <p data-testid="publish-progress" className="mt-2 text-[12px] leading-relaxed">
+          {progress}
+        </p>
+      )}
+      {followError && (
+        <p data-testid="publish-follow-error" className="mt-2 text-[12px] leading-relaxed text-muted-foreground">
+          {PUBLISH_FOLLOW_COPY.followError}
+        </p>
+      )}
       {/* Engine chip — honest provider only; omitted entirely when unknown (T-127-06). */}
       {provider && (
         <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
@@ -676,14 +721,44 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
           </span>
         </div>
       )}
+      {/* 308.1-04 (C-06): the run no longer lives in this request, so the paragraph now says
+          the window may be closed and the check carries on on the server. */}
       <p className="mt-2 leading-relaxed text-muted-foreground">
-        Publish runs your <b>whole workflow for real</b> against your knowledge base, then an independent judge grades the
-        result — so a multi-step workflow can take a <b>few minutes</b>. Same harness, same tools, same model, so the judge
-        grades a <b>real</b> deliverable, not a dry-run. It blocks until the verdict is ready — please <b>don't close the
-        tab</b>; the verdict comes back inline when the run + judge finish.
+        {PUBLISH_FOLLOW_COPY.honesty.map((part, i) => (part.bold ? <b key={i}>{part.text}</b> : <Fragment key={i}>{part.text}</Fragment>))}
       </p>
     </div>
   )
+}
+
+/**
+ * 308.1-04 (D-22, UI-SPEC C-04 / C-05) — the ONE progress line while a run is followed. The
+ * step is named in the AUTHOR's words: the definition's step title through `nodeTitle` when the
+ * step resolves to a phase, else the server's authored `step_name`, else no name at all. The
+ * slug is never a tier (sketch 215 #1).
+ */
+function progressLineFor(
+  phase: UsePublishAttempt["phase"],
+  attempt: PublishAttempt | null,
+  definition?: DefShape | null,
+): string | null {
+  if (phase === "finishing") return PUBLISH_FOLLOW_COPY.finishing
+  if (phase !== "running") return null
+  const progress = attempt?.progress
+  if (!progress || progress.step_index == null) return PUBLISH_FOLLOW_COPY.starting
+  const index = progress.step_index
+  const count = progress.step_count
+  const phases = Array.isArray(definition?.phases) ? definition.phases : []
+  const found = phases.find((p) => p?.phase_index === index - 1) ?? phases[index - 1]
+  const fromDefinition = found
+    ? nodeTitle({
+        slug: typeof found.slug === "string" ? found.slug : "",
+        phase_index: typeof found.phase_index === "number" ? found.phase_index : index - 1,
+        name: found.name ?? null,
+        config: (found.config ?? {}) as PhaseSpecJSON["config"],
+      }).trim()
+    : ""
+  const name = fromDefinition || progress.step_name?.trim() || ""
+  return name ? PUBLISH_PROGRESS({ index, count, name }) : PUBLISH_PROGRESS_UNNAMED({ index, count })
 }
 
 /**
@@ -692,22 +767,18 @@ function PublishingNotice({ elapsedSec, provider }: { elapsedSec: number; provid
  * The honesty contracts live here, unchanged — only the container moved.
  */
 function GauntletContent({
-  definitionId,
   definition,
-  onPublished,
-  loading,
-  setLoading,
+  publish,
   goldenInputRef,
   blocked,
   blockedReason,
   onCancel,
   onOpenRun,
 }: {
-  definitionId: string
   definition?: DefShape | null
-  onPublished?: (version: number, notes: readonly string[]) => void
-  loading: boolean
-  setLoading: (v: boolean) => void
+  /** 308.1-04 (D-03): everything the hook returns. This component keeps no request or follow
+   *  state of its own — only the golden input the author is typing. */
+  publish: UsePublishAttempt
   goldenInputRef: React.RefObject<HTMLTextAreaElement | null>
   /** Phase 186-16 (WR-10) — the wrapper's DERIVED emptiness test, handed down rather
    *  than recomputed. One home for "is this string a reason", so the trigger and the
@@ -722,9 +793,13 @@ function GauntletContent({
   onOpenRun?: (runId: string) => void
 }) {
   const [goldenInput, setGoldenInput] = useState("")
-  const [outcome, setOutcome] = useState<PublishOutcome | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [elapsedSec, setElapsedSec] = useState(0)
+  // 308.1-04 (D-03): the request, the follow, the clock and the outcome are the hook's.
+  const { phase, outcome, error, elapsedSec, attempt, goldenRunId, followError } = publish
+  // `loading` keeps its old meaning — the POST is in flight — so every shipped guard that reads
+  // it (Cancel, the inner Publish label, the error and outcome gates) behaves as it did.
+  const loading = phase === "submitting"
+  const following = phase === "running" || phase === "finishing"
+  const inFlight = loading || following
   // Its OWN id, in the shape the trigger's already uses. A second element is needed
   // rather than a reference to the trigger's because the trigger's reason sits behind
   // the modal backdrop and cannot be read from inside the dialog — and a disabled button
@@ -733,41 +808,13 @@ function GauntletContent({
 
   // Phase 186-16 (WR-10): `!blocked` is the third term. `runGauntlet` already returns
   // immediately when `!canPublish`, so the request cannot leave while a reason stands and
-  // no early return had to be added anywhere else.
-  const canPublish = goldenInput.trim().length > 0 && !loading && !blocked
+  // no early return had to be added anywhere else. 308.1-04 (D-21): nor while the mount read
+  // is still asking whether a run is already going (`opening`).
+  const canPublish = goldenInput.trim().length > 0 && !loading && phase !== "opening" && !blocked
 
-  // Elapsed-seconds ticker — runs only while the golden run is in flight, so the
-  // user can SEE the synchronous publish is alive (no live per-phase progress).
-  useEffect(() => {
-    if (!loading) return
-    setElapsedSec(0)
-    const started = Date.now()
-    const id = window.setInterval(() => {
-      setElapsedSec(Math.floor((Date.now() - started) / 1000))
-    }, 1000)
-    return () => window.clearInterval(id)
-  }, [loading])
-
-  async function runGauntlet() {
+  function runGauntlet() {
     if (!canPublish) return
-    setLoading(true)
-    setError(null)
-    setOutcome(null)
-    try {
-      const result = await publishWorkflow(definitionId, goldenInput)
-      setOutcome(result)
-      // VERBATIM: a PASS is ONLY published === true (never re-derived).
-      if (result.kind === "verdict" && result.verdict.published === true) {
-        onPublished?.(
-          result.verdict.version ?? 0,
-          (result.verdict.auto_answered ?? []).map((note) => note.message),
-        )
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "publish failed")
-    } finally {
-      setLoading(false)
-    }
+    void publish.submit(goldenInput)
   }
 
   // Derive the verdict (for kinds that carry one) WITHOUT re-deriving pass/block.
@@ -919,12 +966,23 @@ function GauntletContent({
       {/* D0 — 8-stage energy-spine: ABOVE the form (sketch 051-A). The spine is the
           centrepiece of the gauntlet — always visible once the modal opens so the user
           can see the 8 checks at a glance before and after clicking Publish. */}
-      <GauntletSpine blockedStage={verdict?.blocked_stage ?? null} running={loading} />
+      <GauntletSpine blockedStage={verdict?.blocked_stage ?? null} running={inFlight} />
+
+      {/* 308.1-04 (C-09): the attempt being followed can no longer be found. The resting form
+          comes back below so the author can start a new check. */}
+      {phase === "lost" && (
+        <p data-testid="publish-lost" className="mt-2 text-[12px] leading-relaxed text-destructive">
+          {PUBLISH_FOLLOW_COPY.lost}
+        </p>
+      )}
 
       {/* D1 — the resting publish form: hidden once a verdict arrives (the HardWall's
           "Fix & re-publish" clears the verdict and re-shows the form). For 404/409
           (no verdict body) the form stays visible so the user can still try again. */}
-      {!verdict && (
+      {/* 308.1-04 (D-UI-02): not while a run is followed — on a reopen this screen does not
+          hold the golden input, and an empty editable box beside a running check is a false
+          invitation. */}
+      {!verdict && !following && (
         <div className="mt-2 rounded-lg border border-border bg-card p-4">
           {/* Phase 199-03 (DES-01, sheet 178 c7): the section heading that used to sit here
               said "◆ Publish this workflow" — the SAME four words the dialog's own title bar
@@ -1016,13 +1074,33 @@ function GauntletContent({
               onClick={runGauntlet}
               className="h-9 rounded bg-primary px-4 text-[13px] font-semibold text-primary-foreground disabled:cursor-not-allowed disabled:opacity-45"
             >
-              {loading ? "Publishing…" : "Publish — run the checks"}
+              {phase === "opening" ? PUBLISH_FOLLOW_COPY.checking : loading ? "Publishing…" : "Publish — run the checks"}
             </button>
           </div>
         </div>
       )}
 
-      {loading && <PublishingNotice elapsedSec={elapsedSec} />}
+      {inFlight && (
+        <PublishingNotice
+          elapsedSec={elapsedSec}
+          heading={phase === "finishing" ? PUBLISH_FOLLOW_COPY.headingFinishing : PUBLISH_FOLLOW_COPY.headingRunning}
+          progress={progressLineFor(phase, attempt, definition)}
+          followError={followError}
+        />
+      )}
+
+      {/* 308.1-04 (D-23): the run can be watched while it goes — the shipped RunLink's classes,
+          its own words, and the same 281-03 rule: no `onOpenRun`, no control. */}
+      {following && goldenRunId != null && onOpenRun && (
+        <button
+          type="button"
+          data-testid="run-link-live"
+          onClick={() => onOpenRun(goldenRunId)}
+          className="mt-4 inline-flex items-center gap-2 rounded border border-primary/40 bg-primary/10 px-3 py-1.5 text-[12px] font-semibold text-primary transition-colors hover:bg-primary/20"
+        >
+          {PUBLISH_FOLLOW_COPY.watchLive}
+        </button>
+      )}
 
       {error && !loading && <div className="mt-3 text-[12px] text-destructive">Publish request failed: {error}</div>}
 
@@ -1186,7 +1264,7 @@ function GauntletContent({
               )}
 
               {/* The judge / any block is a HARD WALL — no override, only Fix & re-publish. */}
-              {isBlock && <HardWall onFix={() => setOutcome(null)} />}
+              {isBlock && <HardWall onFix={publish.reset} />}
             </div>
           )}
         </div>
@@ -1219,16 +1297,29 @@ export function PublishGauntlet({
   // An empty string is NOT a reason, so it does not block — a caller that has nothing to
   // say must not be able to disable the control by accident.
   const blocked = typeof blockedReason === "string" && blockedReason.trim().length > 0
-  // `loading` lives on the wrapper so close affordances (✕ / backdrop / Escape)
-  // can be BLOCKED while a publish is in flight (the gauntlet runs synchronously).
-  const [loading, setLoading] = useState(false)
+  // 308.1-04 (D-03, D-24): the attempt lives on the wrapper so the close affordances (✕ /
+  // backdrop / Escape) can read it. They are BLOCKED only while the POST itself is in flight
+  // (a few seconds of pre-run checks); while the golden run is FOLLOWED they close, and the
+  // run carries on on the server.
+  // The two clients are wrapped rather than passed bare so neither binding is READ at render:
+  // a suite that mocks `@/lib/api` whole and never opens this modal must not need either one
+  // (the 196-08 lesson — a missing mock export throws where it is touched).
+  const publish = usePublishAttempt({
+    definitionId,
+    open,
+    start: (id, goldenInput) => publishWorkflow(id, goldenInput),
+    read: (id) => getPublishAttempt(id),
+    onPublished,
+  })
+  const loading = publish.phase === "submitting"
+  const following = publish.phase === "running" || publish.phase === "finishing"
 
   const dialogRef = useRef<HTMLDivElement>(null)
   const goldenInputRef = useRef<HTMLTextAreaElement>(null)
 
   function requestClose() {
-    // Never close while a publish is in flight (the request blocks; closing would
-    // orphan the in-progress notice + the user's elapsed-time reassurance).
+    // Never close while the POST is in flight (closing would orphan the in-progress notice
+    // + the user's elapsed-time reassurance). 308.1-04: a FOLLOWED run may be closed.
     if (loading) return
     setOpen(false)
   }
@@ -1244,11 +1335,14 @@ export function PublishGauntlet({
    * because the gauntlet was closed while a request was outstanding. No-ops entirely when
    * no parent asked, which is every call site outside the Builder.
    */
+  // 308.1-04 (D-24): running means open AND (the POST is in flight OR a run is followed), so
+  // closing the modal mid-run releases the Builder's autosave hold.
+  const reportRunning = open && (loading || following)
   useEffect(() => {
     if (!onRunningChange) return
-    onRunningChange(loading)
+    onRunningChange(reportRunning)
     return () => onRunningChange(false)
-  }, [loading, onRunningChange])
+  }, [reportRunning, onRunningChange])
 
   // Escape-to-close + simple Tab focus containment — mirrors RunModal's contract.
   useEffect(() => {
@@ -1361,7 +1455,13 @@ export function PublishGauntlet({
                 onClick={requestClose}
                 disabled={loading}
                 aria-label="Close"
-                title={loading ? "Can't close while the gauntlet is running" : "Close"}
+                title={
+                  loading
+                    ? "Can't close while the gauntlet is running"
+                    : following
+                      ? PUBLISH_FOLLOW_COPY.closeWhileFollowing
+                      : "Close"
+                }
                 className="rounded-md border border-border px-2 py-0.5 text-[15px] leading-none text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
               >
                 ✕
@@ -1370,11 +1470,8 @@ export function PublishGauntlet({
             {/* The scrollable body so the 8-stage spine + verdict never overflow. */}
             <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
               <GauntletContent
-                definitionId={definitionId}
                 definition={definition}
-                onPublished={onPublished}
-                loading={loading}
-                setLoading={setLoading}
+                publish={publish}
                 goldenInputRef={goldenInputRef}
                 blocked={blocked}
                 blockedReason={blockedReason}

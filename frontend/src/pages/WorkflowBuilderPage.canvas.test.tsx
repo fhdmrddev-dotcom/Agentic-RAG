@@ -98,6 +98,9 @@ vi.mock("@/lib/api", () => ({
   // reads the author model registry at mount and this factory must declare it.
   getAuthorModelRegistry: () => Promise.resolve({ models: [], run_default_model: null }),
   publishWorkflow: mockPublish,
+  // 308.1-04: opening the publish modal now asks where this draft's publish is; "none" keeps
+  // the resting form every case here drives. Declared because a case here OPENS the modal.
+  getPublishAttempt: () => Promise.resolve({ state: "none", golden_run_id: null, verdict: null, progress: null }),
   // Phase 186-07: `useDraftPersistence` reaches one more symbol — the drafts read its
   // Reload exit reuses. Enumerated here rather than left undefined, because a whole-module
   // factory mock that omits a symbol the composed tree can reach fails far from its cause
