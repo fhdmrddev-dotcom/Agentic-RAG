@@ -104,7 +104,11 @@ def test_the_stand_in_note_is_worded_for_one_and_for_many():
 def test_the_stale_text_only_comment_is_gone():
     import inspect
 
-    src = inspect.getsource(publish_service)
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    # A negative text check goes vacuous if the text moves, so it reads BOTH files.
+    from app.services.harness import publish_tail
+
+    src = inspect.getsource(publish_service) + inspect.getsource(publish_tail)
     assert 'is `"text"` for every field today' not in src
 
 

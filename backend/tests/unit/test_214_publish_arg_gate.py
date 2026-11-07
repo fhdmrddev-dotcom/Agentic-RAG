@@ -1003,12 +1003,19 @@ def test_the_gate_and_the_executor_obtain_the_same_schema_for_one_bound_tool():
     assert {e.argument for e in _lint(_definition(_email_phase()))} == expected
 
     # ── the SOURCE fence, by AST rather than by grep.
-    tree = ast.parse(
-        Path(publish_service.__file__).read_text(encoding="utf-8"), publish_service.__file__
-    )
-    attrs = [n.attr for n in ast.walk(tree) if isinstance(n, ast.Attribute)]
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    # The gate's I/O half (`_bound_tool_schemas`) stayed and its resolved-argument half
+    # (`_golden_run_argument_failures`) moved, so the fence reads the UNION of both files.
+    from app.services.harness import publish_tail
+
+    trees = [
+        ast.parse(Path(m.__file__).read_text(encoding="utf-8"), m.__file__)
+        for m in (publish_service, publish_tail)
+    ]
+    attrs = [n.attr for tree in trees for n in ast.walk(tree) if isinstance(n, ast.Attribute)]
     consts = [
         n.slice.value
+        for tree in trees
         for n in ast.walk(tree)
         if isinstance(n, ast.Subscript)
         and isinstance(n.slice, ast.Constant)

@@ -74,7 +74,8 @@ _WARNING_FORMAT = "runs.usage missing for run=%s provider=%s model=%s"
 #: The three files this plan repairs. Site 3 lives in ``harness_engine`` (plan 256-01).
 _SUBJECT_FILES = (
     "app/api/runs.py",
-    "app/services/harness/publish_service.py",
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    "app/services/harness/publish_tail.py",
     "app/services/unattended_launch.py",  # Phase 293: site 5 moved here from scheduler_service
 )
 
@@ -647,7 +648,10 @@ def test_the_warning_format_string_leaks_no_token_values(rel):
 def test_the_warning_literal_appears_once_per_shell():
     """One literal per site — two in runs.py (two shells), one in each other file."""
     assert _read("app/api/runs.py").count(_WARNING_FORMAT) == 2
-    assert _read("app/services/harness/publish_service.py").count(_WARNING_FORMAT) == 1
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed. The
+    # literal moved with ``_drive_golden_run``; publish_service now carries none.
+    assert _read("app/services/harness/publish_tail.py").count(_WARNING_FORMAT) == 1
+    assert _read("app/services/harness/publish_service.py").count(_WARNING_FORMAT) == 0
     # Phase 293: site 5's literal moved with ``_drive_run``; the scheduler now carries none.
     assert _read("app/services/unattended_launch.py").count(_WARNING_FORMAT) == 1
     assert _read("app/services/scheduler_service.py").count(_WARNING_FORMAT) == 0
@@ -658,7 +662,8 @@ def test_the_warning_literal_appears_once_per_shell():
 #: see the docstring below for why that was narrowed.
 _SHELL_FUNCTIONS = {
     "app/api/runs.py": ("_redrive_paused_workflow_run", "continue_run"),
-    "app/services/harness/publish_service.py": ("_drive_golden_run",),
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    "app/services/harness/publish_tail.py": ("_drive_golden_run",),
     "app/services/unattended_launch.py": ("_drive_run",),  # Phase 293: moved with the code
 }
 

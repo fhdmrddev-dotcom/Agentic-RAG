@@ -768,7 +768,11 @@ def test_S6_native_control_descriptor_equals_the_adapters_own_declaration():
 
 
 _SCHEMA_CALLERS = {
-    "gate": _BACKEND / "app" / "services" / "harness" / "publish_service.py",
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    # `resolve_arguments(schema=...)` moved with `_golden_run_argument_failures`; the gate's
+    # static half (`_bound_tool_schemas`) stayed, so BOTH files are callers held to the rule.
+    "gate": _BACKEND / "app" / "services" / "harness" / "publish_tail.py",
+    "gate_static": _BACKEND / "app" / "services" / "harness" / "publish_service.py",
     "executor": _BACKEND / "app" / "services" / "harness" / "phase_types.py",
     "pause": _BACKEND / "app" / "services" / "harness_engine.py",
 }
@@ -842,6 +846,7 @@ def test_S6_the_one_legitimate_INPUT_SCHEMA_read_is_the_compat_arm_and_stays_alo
         counts[role] = code.count(needle)
 
     assert counts["gate"] == 0, "the publish gate grew its own schema extraction"
+    assert counts["gate_static"] == 0, "the publish gate grew its own schema extraction"
     assert counts["pause"] == 0, "the approval pause grew its own schema extraction"
     assert counts["executor"] == 1, (
         f"the executor carries {counts['executor']} adapter-declaration reads; exactly ONE is "

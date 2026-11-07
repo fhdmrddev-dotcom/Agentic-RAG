@@ -455,7 +455,7 @@ node scripts/check-hot-file-ledger.cjs <phase-dir>   # 0 clear · 1 missing rows
 | `backend/app/services/harness/grounding.py` | 23 / 10 / 1437 (was `21 / 8 / 1414`) | 295-03: ONE pure predicate (is_engine_citation_gate) |
 | `frontend/src/components/workflows/PhaseFormPanel.tsx` | 30 / 14 / 1566 | honoured by construction ×6 (185 / 193 / 193.1 / 199 / 200 / **214**) |
 | `backend/app/db/workflows.py` | 65 / 33 / 2874 (was `64 / 32 / 2874`) | 306-04: _RUN_ORIGIN_KINDS + mcp (mig 220 CHECK mirror) |
-| `backend/app/services/harness/publish_service.py` | 37 / 17 / 2066 (was `36 / 16 / 2061`) | 302-02: no stand-in for inputs the practice run never asks (BE-IN-03) |
+| `backend/app/services/harness/publish_service.py` | 38 / 18 / 1053 (was `37 / 17 / 2066`) | 308.1-01: drive + tail moved to publish_tail.py (pure move, D-02) · ⛔ |
 | `backend/app/services/workflow_authoring.py` | 23 / 13 / 1269 (was `18 / 12 / 1120`) | 296-03: unticked told; provider_error; file-free requirement · seam OWED |
 | `backend/app/models/harness.py` | 22 / 20 / 776 (was `20 / 19 / 766`) | 291-02: InputFieldSpec origin + note, omitted when absent |
 | `frontend/src/components/workflows/builderStore.ts` | 16 / 9 / 1039 (was `14 / 8 / 968`) | 291: two actions (refs, input source), no state field |

@@ -151,7 +151,8 @@ def test_the_app_kickoff_stamps_app():
 
 
 def test_the_publish_golden_run_carries_no_origin():
-    calls = _calls_named(_tree("app/services/harness/publish_service.py"), "create_workflow_run")
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    calls = _calls_named(_tree("app/services/harness/publish_tail.py"), "create_workflow_run")
     assert calls, "the golden-run call moved; re-derive this fence"
     for call in calls:
         for name in ("origin_kind", "origin_label", "origin_ref"):

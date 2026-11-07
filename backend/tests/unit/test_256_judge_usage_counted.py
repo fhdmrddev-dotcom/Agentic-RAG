@@ -55,6 +55,10 @@ from uuid import UUID, uuid4
 import pytest
 
 import app.services.harness.publish_service as ps
+# Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed. The source
+# fences below read the file that now HOLDS the judge and the QUAL-01 stage; calls still go
+# through ``ps`` (its re-exports are the same objects).
+import app.services.harness.publish_tail as pt
 import app.services.harness.validator_kinds as vk
 
 
@@ -436,7 +440,7 @@ async def test_the_publish_judge_with_no_box_is_byte_identical_to_what_shipped(
 
 def _qual01_source() -> str:
     """The QUAL-01 stage's source, sliced at its own landmarks."""
-    src = Path(ps.__file__).read_text(encoding="utf-8")
+    src = Path(pt.__file__).read_text(encoding="utf-8")  # 308.1-01: moved, re-pointed
     start = src.index("# ── stage 4: the judge verdict")
     end = src.index("# ── stage 5: flip")
     return src[start:end]
@@ -751,7 +755,8 @@ _EXPECTED_FORCED_EMIT_SITES: dict[str, str] = {
     "services/eval_runner_service.py": "REGISTERED (SEED-300 hole 3 — an eval `runs` row, no token_coverage marker)",
     "services/expert_authoring.py": "NO-RUN",
     "services/harness/phase_types.py": "COUNTED-INTO-RUN-BOX",
-    "services/harness/publish_service.py": "COUNTED-VIA-PERSIST",
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    "services/harness/publish_tail.py": "COUNTED-VIA-PERSIST",
     "services/harness/validator_kinds.py": "COUNTED-INTO-RUN-BOX",
     # Phase 263 (PACK-15 / D-263-13). ⭐ THIS FENCE IS WHAT FOUND THE SITE: `263-02-PLAN.md`
     # named `test_259_closed_core_inventory.py` as the registry a new service must not disturb
@@ -1028,7 +1033,7 @@ def test_the_validator_import_is_function_local_because_a_module_level_one_cycle
 
 def test_the_publish_usage_box_is_keyword_only_and_defaults_to_none():
     """Additive by construction: every pre-existing caller stays byte-identical."""
-    tree = ast.parse(Path(ps.__file__).read_text(encoding="utf-8"))
+    tree = ast.parse(Path(pt.__file__).read_text(encoding="utf-8"))  # 308.1-01: moved, re-pointed
     fn = next(
         n
         for n in ast.walk(tree)
@@ -1054,7 +1059,7 @@ def test_the_publish_accumulators_are_declared_above_the_retry_loop():
     count; initialised to ``0`` they would make a judge that reported no usage at all
     look measured-at-zero rather than never-measured.
     """
-    src = Path(ps.__file__).read_text(encoding="utf-8")
+    src = Path(pt.__file__).read_text(encoding="utf-8")  # 308.1-01: moved, re-pointed
     fn = src[src.index("async def _judge_golden_output") :]
     fn = fn[: fn.index("\ndef _author_judge_criteria")]
     loop_at = fn.index("for _attempt in range(3):")

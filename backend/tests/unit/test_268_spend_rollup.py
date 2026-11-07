@@ -145,7 +145,8 @@ _PLACEHOLDER_WRITER = re.compile(r"(?<![.\w])model\s*=\s*[\"']unknown[\"']\s*,")
 _EXPECTED_PLACEHOLDER_WRITERS = {
     "api/runs.py": "Harness Continue / re-drive producer shell (Facet C, 092-07)",
     "services/harness_engine.py": "startup-sweep / scheduler resume producer shell",
-    "services/harness/publish_service.py": "golden-run publish validation shell",
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    "services/harness/publish_tail.py": "golden-run publish validation shell",
 }
 
 

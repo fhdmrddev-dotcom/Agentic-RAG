@@ -552,9 +552,12 @@ def test_publish_mints_no_code_validate_cannot_classify():
     from app.api import workflows
     from app.services.harness import grounding
 
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    # The publish path's codes now live in two files (`no_source` moved with the argument
+    # check), so the scan reads the UNION of both.
     publish_codes = _scan(
         _VERDICT_EMIT_RE, _read("app", "services", "harness", "publish_service.py")
-    )
+    ) | _scan(_VERDICT_EMIT_RE, _read("app", "services", "harness", "publish_tail.py"))
     unknown_to_validate = publish_codes - set(workflows._KNOWN_CODES)
 
     assert unknown_to_validate == set(), (

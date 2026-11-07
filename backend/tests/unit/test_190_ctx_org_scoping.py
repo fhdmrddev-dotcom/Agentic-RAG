@@ -51,7 +51,10 @@ CTX_BUILDERS = [
     ("services/harness_engine.py", "_build_resume_context", True),
 ]
 
-PUBLISH_BUILDER = ("services/harness/publish_service.py", None, False)
+# Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed. The golden ctx
+# build moved verbatim with `_drive_golden_run`, and this fence still fails when the file it scans
+# has no `is_golden_run` SimpleNamespace (driven against an empty file at 308.1-01).
+PUBLISH_BUILDER = ("services/harness/publish_tail.py", None, False)
 
 
 def _simplenamespace_kwargs(path: Path, func_name: str | None) -> list[set[str]]:

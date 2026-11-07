@@ -44,7 +44,8 @@ _EXPECTED_INSERT_RUN_SITES: dict[str, str] = {
     "services/task_service.py:1": "COPY-PARENT(SQL) (sub-agent: parent_run_id; the SQL copies org/Expert)",
     "api/runs.py:1": "NO-EXPERT(harness continue shell, model='unknown')",
     "services/harness_engine.py:1": "NO-EXPERT(resume shell: boot sweep / ask_user re-drive / scheduler)",
-    "services/harness/publish_service.py:1": "NO-EXPERT(golden-run shell)",
+    # Phase 308.1-01: the code moved to publish_tail.py (D-02); re-pointed, not relaxed.
+    "services/harness/publish_tail.py:1": "NO-EXPERT(golden-run shell)",
     "api/evals.py:1": "NO-EXPERT(eval run companion)",
     "api/evals.py:2": "NO-EXPERT(eval run companion)",
     "api/evals.py:3": "NO-EXPERT(eval run companion)",
